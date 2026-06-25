@@ -57,6 +57,8 @@ def _runtime_roots() -> list[Path]:
         [
             exe_dir / "backend-runtimes",
             exe_dir.parent / "backend-runtimes",
+            exe_dir.parent.parent / "backend-runtimes",
+            exe_dir.parent.parent.parent / "backend-runtimes",
             Path.cwd() / "backend-runtimes",
         ]
     )

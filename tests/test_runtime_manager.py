@@ -110,3 +110,94 @@ def test_preferred_runtime_must_be_available() -> None:
         assert "preferred backend runtime is not available" in str(exc)
     else:
         raise AssertionError("expected unavailable preferred runtime to fail")
+
+
+def test_so_vits_worker_prefers_env_contentvec_asset_dir(tmp_path: Path, monkeypatch) -> None:
+    from audiocover.workers import so_vits_svc_worker
+
+    asset_dir = tmp_path / "content-vec-best"
+    asset_dir.mkdir()
+    (asset_dir / "config.json").write_text("{}", encoding="utf-8")
+    (asset_dir / "pytorch_model.bin").write_bytes(b"weights")
+
+    monkeypatch.setenv("AUDIOCOVER_CONTENT_VEC_BEST_DIR", str(asset_dir))
+
+    assert so_vits_svc_worker._contentvec_dir() == asset_dir
+
+
+def test_so_vits_worker_copies_bundled_init_checkpoints(tmp_path: Path, monkeypatch) -> None:
+    from audiocover.workers import so_vits_svc_worker
+
+    asset_dir = tmp_path / "so-vits-svc-init"
+    asset_dir.mkdir()
+    (asset_dir / "D_0.pth").write_bytes(b"d")
+    (asset_dir / "G_0.pth").write_bytes(b"g")
+    model_dir = tmp_path / "model"
+
+    monkeypatch.setenv("AUDIOCOVER_SO_VITS_SVC_INIT_DIR", str(asset_dir))
+    so_vits_svc_worker._copy_bundled_init_checkpoints(model_dir)
+
+    assert (model_dir / "D_0.pth").read_bytes() == b"d"
+    assert (model_dir / "G_0.pth").read_bytes() == b"g"
+
+
+def test_runtime_manager_ignores_non_object_json_logs(tmp_path: Path) -> None:
+    runtime_root = tmp_path / "backend-runtimes"
+    _write_fake_runtime(
+        runtime_root,
+        "import json, sys\n"
+        "req=json.loads(sys.stdin.read())\n"
+        "print(json.dumps({'id': req['id'], 'ok': True, 'result': {'value': 9}}), flush=True)\n"
+        "print(json.dumps('HTTP/1.1 206 Partial Content'), flush=True)\n",
+    )
+
+    manager = BackendRuntimeManager(runtime_roots=[runtime_root])
+    assert manager.invoke("simple-timbre", "train", {}) == {"value": 9}
+
+
+def test_runtime_manager_reports_missing_worker_response(tmp_path: Path) -> None:
+    runtime_root = tmp_path / "backend-runtimes"
+    _write_fake_runtime(
+        runtime_root,
+        "import json, sys\n"
+        "json.loads(sys.stdin.read())\n"
+        "print(json.dumps('HTTP/1.1 206 Partial Content'), flush=True)\n",
+    )
+
+    manager = BackendRuntimeManager(runtime_roots=[runtime_root])
+    try:
+        manager.invoke("simple-timbre", "train", {})
+    except BackendRuntimeError as exc:
+        assert "valid JSON response" in str(exc)
+    else:
+        raise AssertionError("expected missing worker response to fail")
+
+
+def test_so_vits_worker_missing_contentvec_fails_closed(monkeypatch) -> None:
+    from audiocover.workers import so_vits_svc_worker
+
+    monkeypatch.delenv("AUDIOCOVER_CONTENT_VEC_BEST_DIR", raising=False)
+    monkeypatch.delenv("AUDIOCOVER_ALLOW_RUNTIME_DOWNLOADS", raising=False)
+    monkeypatch.setattr(so_vits_svc_worker, "_contentvec_dir", lambda: None)
+
+    try:
+        so_vits_svc_worker._patch_contentvec_loader()
+    except RuntimeError as exc:
+        assert "ContentVec assets are missing" in str(exc)
+    else:
+        raise AssertionError("expected missing ContentVec assets to fail")
+
+
+def test_so_vits_worker_missing_init_checkpoints_fails_closed(tmp_path: Path, monkeypatch) -> None:
+    from audiocover.workers import so_vits_svc_worker
+
+    monkeypatch.delenv("AUDIOCOVER_SO_VITS_SVC_INIT_DIR", raising=False)
+    monkeypatch.delenv("AUDIOCOVER_ALLOW_RUNTIME_DOWNLOADS", raising=False)
+    monkeypatch.setattr(so_vits_svc_worker, "_asset_dir", lambda name, required_files: None)
+
+    try:
+        so_vits_svc_worker._copy_bundled_init_checkpoints(tmp_path / "model")
+    except RuntimeError as exc:
+        assert "initialization checkpoints are missing" in str(exc)
+    else:
+        raise AssertionError("expected missing initialization checkpoints to fail")

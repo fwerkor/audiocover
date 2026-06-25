@@ -165,7 +165,9 @@ audiocover doctor
 
 AudioCover uses a runtime manager in the main process and isolated worker executables under `backend-runtimes/`. Workers are invoked with JSON requests over stdin/stdout, which keeps backend dependency sets separated from the GUI process.
 
-Desktop artifacts include the lightweight built-in worker. Runtime packs provide larger backend workers. The runtime manager discovers `backend-runtimes/` in the install directory, beside the executable, or through `AUDIOCOVER_BACKEND_RUNTIMES`. Python, pip, and backend command-line tools do not need to be installed by desktop users.
+Desktop artifacts include the lightweight built-in worker. Runtime packs provide larger backend workers and any packaged model assets required by those workers. The runtime manager discovers `backend-runtimes/` in the install directory, beside the executable, or through `AUDIOCOVER_BACKEND_RUNTIMES`. Python, pip, and backend command-line tools do not need to be installed by desktop users.
+
+Backend workers do not silently download missing model assets during normal desktop use. If a required asset is missing, install the matching runtime pack. Developers who intentionally want legacy runtime downloads can set `AUDIOCOVER_ALLOW_RUNTIME_DOWNLOADS=1`.
 
 ## Responsible use
 

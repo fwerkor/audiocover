@@ -5,11 +5,15 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import http.client
 import json
 import os
 import platform
 import shutil
 import subprocess
+import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import NoReturn
 
@@ -38,6 +42,26 @@ WORKER_COLLECTS = {
     "rvc": ("rvc_python",),
     "so-vits-svc": ("so_vits_svc_fork", "librosa", "sklearn"),
     "demucs-separator": ("demucs",),
+}
+RUNTIME_ASSETS = {
+    "so-vits-svc": (
+        (
+            "content-vec-best/config.json",
+            "https://huggingface.co/fwerkor/content-vec-best/resolve/main/config.json",
+        ),
+        (
+            "content-vec-best/pytorch_model.bin",
+            "https://huggingface.co/fwerkor/content-vec-best/resolve/main/pytorch_model.bin",
+        ),
+        (
+            "so-vits-svc-init/D_0.pth",
+            "https://huggingface.co/datasets/ms903/sovits4.0-768vec-layer12/resolve/main/sovits_768l12_pre_large_320k/clean_D_320000.pth",
+        ),
+        (
+            "so-vits-svc-init/G_0.pth",
+            "https://huggingface.co/datasets/ms903/sovits4.0-768vec-layer12/resolve/main/sovits_768l12_pre_large_320k/clean_G_320000.pth",
+        ),
+    ),
 }
 WORKER_EXCLUDES = (
     "IPython",
@@ -77,6 +101,53 @@ def _platform_name() -> str:
 def _run(command: list[str], *, env: dict[str, str] | None = None) -> None:
     print("+", " ".join(command), flush=True)
     subprocess.run(command, cwd=ROOT, check=True, env=env)
+
+
+def _download_file(url: str, output_path: Path, *, retries: int = 8) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = output_path.with_name(output_path.name + ".download")
+    if output_path.exists() and output_path.stat().st_size > 0:
+        print(f"asset present: {output_path.relative_to(ROOT)}", flush=True)
+        return
+
+    for attempt in range(1, retries + 1):
+        headers = {"User-Agent": "AudioCover release builder"}
+        existing = temp_path.stat().st_size if temp_path.exists() else 0
+        if existing:
+            headers["Range"] = f"bytes={existing}-"
+        request = urllib.request.Request(url, headers=headers)
+        mode = "ab" if existing else "wb"
+        try:
+            print(
+                f"downloading asset {output_path.relative_to(ROOT)}"
+                f" attempt {attempt}/{retries} offset={existing}",
+                flush=True,
+            )
+            with urllib.request.urlopen(request, timeout=180) as response, temp_path.open(mode) as handle:
+                if existing and response.status == 200:
+                    handle.seek(0)
+                    handle.truncate()
+                while True:
+                    chunk = response.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    handle.write(chunk)
+            temp_path.replace(output_path)
+            print(f"downloaded asset: {output_path.relative_to(ROOT)}", flush=True)
+            return
+        except (TimeoutError, urllib.error.URLError, http.client.HTTPException, OSError) as exc:
+            if attempt >= retries:
+                raise RuntimeError(f"failed to download {url}: {exc}") from exc
+            time.sleep(min(30, attempt * 3))
+
+
+def _install_runtime_assets(worker_name: str, worker_dist: Path) -> None:
+    assets = RUNTIME_ASSETS.get(worker_name, ())
+    if not assets:
+        return
+    asset_root = worker_dist / "assets"
+    for relative_name, url in assets:
+        _download_file(url, asset_root / relative_name)
 
 
 def _capture_json(command: list[str], *, input_json: dict) -> dict:
@@ -162,6 +233,7 @@ def build_workers(worker_names: tuple[str, ...], *, clean: bool, runtime_dir: Pa
         executable = _worker_executable(worker_name, runtime_dir)
         if not executable.exists():
             raise FileNotFoundError(f"worker executable was not created: {executable}")
+        _install_runtime_assets(worker_name, worker_dist)
 
 
 def smoke_test_workers(

@@ -56,7 +56,26 @@ def _is_response_line(line: str, request_id: str) -> bool:
         data = json.loads(line)
     except json.JSONDecodeError:
         return False
-    return data.get("id") == request_id and "ok" in data
+    return isinstance(data, dict) and data.get("id") == request_id and "ok" in data
+
+
+def _find_worker_response(stdout_lines: list[str], request_id: str) -> dict[str, Any]:
+    parse_errors: list[str] = []
+    for line in reversed([item for item in stdout_lines if item]):
+        if not line.startswith("{"):
+            continue
+        try:
+            response = json.loads(line)
+        except json.JSONDecodeError as exc:
+            parse_errors.append(str(exc))
+            continue
+        if not isinstance(response, dict):
+            continue
+        if response.get("id") == request_id and "ok" in response:
+            return response
+    tail = "\n".join(stdout_lines)[-4000:]
+    details = f"; parse errors: {parse_errors[-3:]}" if parse_errors else ""
+    raise BackendRuntimeError(f"worker did not return a valid JSON response{details}: {tail}")
 
 
 def _runtime_roots() -> list[Path]:
@@ -215,17 +234,9 @@ class BackendRuntimeManager:
                 f"{worker_name} runtime failed with exit code {return_code}: "
                 f"{stderr_tail or stdout_tail}"
             )
-        stdout = [line for line in stdout_lines if line]
-        if not stdout:
+        if not [line for line in stdout_lines if line]:
             raise BackendRuntimeError(f"{worker_name} runtime returned no JSON response")
-        try:
-            response = json.loads(stdout[-1])
-        except json.JSONDecodeError as exc:
-            raise BackendRuntimeError(
-                f"{worker_name} runtime returned invalid JSON: {stdout[-1][:1000]}"
-            ) from exc
-        if response.get("id") != request["id"]:
-            raise BackendRuntimeError(f"{worker_name} runtime response id mismatch")
+        response = _find_worker_response(stdout_lines, request["id"])
         if not response.get("ok"):
             error = response.get("error") or "unknown runtime error"
             raise BackendRuntimeError(f"{worker_name} runtime {action} failed: {error}")

@@ -86,46 +86,55 @@ jobs:
         include:
           - backend: demucs
             packages: '"torch>=2.2.0" "torchaudio>=2.2.0" "demucs>=4.0.1"'
+            pip: pip
             python: '3.12'
             name: windows-x64
             os: windows-latest
           - backend: demucs
             packages: '"torch>=2.2.0" "torchaudio>=2.2.0" "demucs>=4.0.1"'
+            pip: pip
             python: '3.12'
             name: linux-x64
             os: ubuntu-latest
           - backend: demucs
             packages: '"torch>=2.2.0" "torchaudio>=2.2.0" "demucs>=4.0.1"'
+            pip: pip
             python: '3.12'
             name: linux-arm64
             os: ubuntu-24.04-arm
           - backend: demucs
             packages: '"torch>=2.2.0" "torchaudio>=2.2.0" "demucs>=4.0.1"'
+            pip: pip
             python: '3.12'
             name: macos-arm64
             os: macos-latest
           - backend: so-vits-svc
             packages: '"so-vits-svc-fork==4.2.30"'
+            pip: pip
             python: '3.12'
             name: windows-x64
             os: windows-latest
           - backend: so-vits-svc
             packages: '"so-vits-svc-fork==4.2.30"'
+            pip: pip
             python: '3.12'
             name: linux-x64
             os: ubuntu-latest
           - backend: so-vits-svc
             packages: '"so-vits-svc-fork==4.2.30"'
+            pip: pip
             python: '3.12'
             name: linux-arm64
             os: ubuntu-24.04-arm
           - backend: so-vits-svc
             packages: '"so-vits-svc-fork==4.2.30"'
+            pip: pip
             python: '3.12'
             name: macos-arm64
             os: macos-latest
           - backend: rvc
             packages: '"rvc-python==0.1.5"'
+            pip: '"pip<24.1"'
             python: '3.10'
             name: linux-x64
             os: ubuntu-latest
@@ -144,7 +153,7 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install ffmpeg
       - name: Install runtime build dependencies
-        run: python -m pip install -U pip pyinstaller build && python -m pip install ${{ matrix.packages }}
+        run: python -m pip install -U ${{ matrix.pip }} pyinstaller build && python -m pip install ${{ matrix.packages }}
       - name: Build runtime pack
         run: python scripts/build_desktop.py --runtime-pack ${{ matrix.backend }}
       - uses: actions/upload-artifact@v4

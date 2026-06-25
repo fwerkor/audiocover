@@ -6,7 +6,55 @@ from pathlib import Path
 from .config import ConversionConfig, ModelPackage, TrainingConfig, resolve_training_config
 from .dataset import prepare_dataset
 from .external import run_template
+from .runtime import BackendRuntimeManager
 from .simple_timbre import train_simple_timbre
+
+
+def _relative_to_output(path: str | None, output_dir: Path) -> Path | None:
+    if not path:
+        return None
+    value = Path(path)
+    if not value.is_absolute():
+        return value
+    try:
+        return value.relative_to(output_dir)
+    except ValueError:
+        return value
+
+
+def _package_from_runtime(
+    *,
+    display_name: str,
+    config: TrainingConfig,
+    output_dir: Path,
+    runtime_backend: str,
+    result: dict,
+) -> ModelPackage:
+    simple_profile = _relative_to_output(result.get("simple_profile_path"), output_dir)
+    model_path = _relative_to_output(result.get("model_path"), output_dir)
+    index_path = _relative_to_output(result.get("index_path"), output_dir)
+    conversion_backend = str(result.get("conversion_backend") or "managed")
+    if conversion_backend == "simple-timbre":
+        conversion_backend = "managed"
+    conversion = ConversionConfig(
+        backend=conversion_backend,
+        runtime_backend=runtime_backend,
+        model_path=model_path,
+        index_path=index_path,
+        simple_profile_path=simple_profile,
+        f0_method=config.f0_method,
+    )
+    return ModelPackage(
+        display_name=display_name,
+        training=config,
+        conversion=conversion,
+        runtime_backend=runtime_backend,
+        model_path=model_path,
+        index_path=index_path,
+        simple_profile_path=simple_profile,
+        f0_method=config.f0_method,
+        notes=result.get("notes"),
+    )
 
 
 def train_model(
@@ -31,7 +79,37 @@ def train_model(
     if not report["items"]:
         raise RuntimeError("dataset preparation produced no usable audio segments")
 
-    if config.backend == "simple-timbre":
+    if config.backend == "managed":
+        manager = BackendRuntimeManager()
+        runtime_backend = (
+            manager.require_training_backend(config.runtime_backend)
+            if config.runtime_backend
+            else manager.select_training_backend()
+        )
+        result = manager.invoke(
+            runtime_backend,
+            "train",
+            {
+                "raw_data_dir": str(raw_data_dir),
+                "dataset_dir": str(dataset_dir),
+                "dataset_wavs": str(dataset_dir / "wavs"),
+                "output_dir": str(output_dir),
+                "display_name": display_name,
+                "sample_rate": config.sample_rate,
+                "segment_seconds": config.segment_seconds,
+                "epochs": config.epochs,
+                "batch_size": config.batch_size,
+                "f0_method": config.f0_method,
+            },
+        )
+        package = _package_from_runtime(
+            display_name=display_name,
+            config=config,
+            output_dir=output_dir,
+            runtime_backend=runtime_backend,
+            result=result,
+        )
+    elif config.backend == "simple-timbre":
         simple_profile = train_simple_timbre(dataset_dir / "wavs", output_dir / "simple_timbre.json", config.sample_rate)
         package = ModelPackage(
             display_name=display_name,
@@ -43,7 +121,7 @@ def train_model(
             ),
             simple_profile_path=simple_profile.name,
             f0_method=config.f0_method,
-            notes="Built-in lightweight model. Use external RVC/SVC training for best quality.",
+            notes="Built-in lightweight model. Use a managed runtime package for backend-specific models.",
         )
     elif config.backend == "external":
         model_path = output_dir / "model.pth"
@@ -73,7 +151,7 @@ def train_model(
             model_path=model_path.name if model_path.exists() else None,
             index_path=index_path.name if index_path.exists() else None,
             f0_method=config.f0_method,
-            notes="External backend model package. Fill conversion.command_template if the training tool did not write it.",
+            notes="External backend model package.",
         )
     else:
         raise ValueError(f"unknown training backend: {config.backend}")

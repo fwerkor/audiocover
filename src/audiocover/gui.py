@@ -105,9 +105,9 @@ class AudioCoverGui:
         )
 
         backend_note = (
-            "Backend policy: AudioCover decides automatically. It uses the strongest packaged external "
-            "training commands when a model workflow provides them; otherwise it builds the local profile "
-            "needed for an offline, CPU-testable run. No backend choice is required in the GUI."
+            "Backend policy: AudioCover selects a packaged backend runtime automatically. Backend workers "
+            "run in isolated processes and communicate with the desktop app through a local JSON protocol. "
+            "The GUI does not require a separate Python or backend setup."
         )
         ttk.Label(self.train_frame, text=backend_note, wraplength=780, justify="left").grid(
             row=6, column=0, columnspan=3, sticky="w", pady=10
@@ -131,10 +131,9 @@ class AudioCoverGui:
         ttk.Button(self.render_frame, text="Generate cover", command=self._start_render).grid(row=4, column=1, sticky="e", pady=10)
 
         render_note = (
-            "Rendering policy: AudioCover uses the built-in high-quality preset. It selects Demucs "
-            "with CUDA, Apple MPS, or CPU automatically when available, lets the model package choose "
-            "the conversion implementation, applies the standard mix/QC chain, and avoids overwriting "
-            "an existing run by creating a timestamped folder when needed."
+            "Rendering policy: AudioCover uses the built-in preset, selects packaged backend runtimes "
+            "automatically, applies the standard mix/QC chain, and avoids overwriting an existing run by "
+            "creating a timestamped folder when needed."
         )
         ttk.Label(self.render_frame, text=render_note, wraplength=780, justify="left").grid(
             row=5, column=0, columnspan=3, sticky="w", pady=10

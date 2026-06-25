@@ -14,6 +14,7 @@ from .config import RenderConfig, TrainingConfig, default_config_path
 from .dataset import prepare_dataset as prepare_dataset_impl
 from .pipeline import render_cover
 from .qc import analyze_audio
+from .runtime import WORKER_MODULES, BackendRuntimeManager
 from .training import train_model
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
@@ -38,6 +39,12 @@ def doctor() -> None:
             table.add_row(module, "ok", "importable")
         except Exception as exc:
             table.add_row(module, "missing", str(exc))
+    manager = BackendRuntimeManager()
+    for worker_name in WORKER_MODULES:
+        cap = manager.capabilities(worker_name)
+        status = "ok" if cap.available else "inactive"
+        detail = ",".join(cap.actions) if cap.available else (cap.reason or "not available")
+        table.add_row(f"runtime:{worker_name}", status, detail)
     console.print(table)
 
 

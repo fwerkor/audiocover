@@ -9,6 +9,7 @@ __pycache__/
 .DS_Store
 dist/
 build/
+backend-runtimes/
 *.spec.bak
 runs/
 input/

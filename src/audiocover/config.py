@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 
 class SeparatorConfig(BaseModel):
-    backend: Literal["auto", "demucs", "external", "none"] = "auto"
+    backend: Literal["auto", "managed", "demucs", "external", "none"] = "auto"
     model: str = "htdemucs_ft"
     device: str = "auto"
     shifts: int = Field(default=8, ge=0, le=32)
@@ -21,7 +21,8 @@ class SeparatorConfig(BaseModel):
 
 
 class ConversionConfig(BaseModel):
-    backend: Literal["auto", "external", "passthrough", "simple-timbre"] = "auto"
+    backend: Literal["auto", "managed", "external", "passthrough", "simple-timbre"] = "auto"
+    runtime_backend: str | None = None
     command_template: str | None = None
     model_path: Path | None = None
     index_path: Path | None = None
@@ -35,7 +36,8 @@ class ConversionConfig(BaseModel):
 
 
 class TrainingConfig(BaseModel):
-    backend: Literal["auto", "simple-timbre", "external"] = "auto"
+    backend: Literal["auto", "managed", "simple-timbre", "external"] = "auto"
+    runtime_backend: str | None = None
     sample_rate: int = 48000
     segment_seconds: float = Field(default=12.0, ge=2.0, le=30.0)
     epochs: int = Field(default=200, ge=1)
@@ -89,6 +91,7 @@ class ModelPackage(BaseModel):
     display_name: str
     training: TrainingConfig = Field(default_factory=TrainingConfig)
     conversion: ConversionConfig = Field(default_factory=ConversionConfig)
+    runtime_backend: str | None = None
     model_path: Path | None = None
     index_path: Path | None = None
     simple_profile_path: Path | None = None
@@ -129,6 +132,8 @@ class ModelPackage(BaseModel):
             data["index_path"] = self.index_path
         if self.simple_profile_path is not None:
             data["simple_profile_path"] = self.simple_profile_path
+        if self.runtime_backend is not None:
+            data["runtime_backend"] = self.runtime_backend
         data["transpose"] = self.transpose
         data["f0_method"] = self.f0_method
         return ConversionConfig.model_validate(data)
@@ -196,7 +201,9 @@ def resolve_conversion_config(cfg: ConversionConfig) -> ConversionConfig:
         return cfg
 
     data = cfg.model_dump()
-    if cfg.command_template:
+    if cfg.runtime_backend:
+        data["backend"] = "managed"
+    elif cfg.command_template:
         data["backend"] = "external"
     elif cfg.simple_profile_path:
         data["backend"] = "simple-timbre"
@@ -211,5 +218,5 @@ def resolve_training_config(cfg: TrainingConfig) -> TrainingConfig:
     if cfg.backend != "auto":
         return cfg
     data = cfg.model_dump()
-    data["backend"] = "external" if cfg.commands else "simple-timbre"
+    data["backend"] = "external" if cfg.commands else "managed"
     return TrainingConfig.model_validate(data)

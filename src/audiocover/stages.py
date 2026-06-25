@@ -26,6 +26,7 @@ from .config import (
     resolve_separator_config,
 )
 from .external import run_template
+from .runtime import BackendRuntimeManager
 from .simple_timbre import apply_simple_timbre
 
 
@@ -41,10 +42,33 @@ class Converted:
 
 
 def separate(input_wav: Path, out_dir: Path, cfg: SeparatorConfig) -> Stems:
-    cfg = resolve_separator_config(cfg)
     out_dir.mkdir(parents=True, exist_ok=True)
     vocals = out_dir / "vocals.wav"
     instrumental = out_dir / "instrumental.wav"
+
+    if cfg.backend in {"auto", "managed"}:
+        manager = BackendRuntimeManager()
+        runtime_backend = manager.select_separator_backend()
+        if runtime_backend:
+            data = cfg.model_dump()
+            if data.get("device") == "auto":
+                data["device"] = "cpu"
+            result = manager.invoke(
+                runtime_backend,
+                "separate",
+                {
+                    "input": str(input_wav),
+                    "out_dir": str(out_dir),
+                    "vocals": str(vocals),
+                    "instrumental": str(instrumental),
+                    **data,
+                },
+            )
+            return Stems(Path(result["vocals"]), Path(result["instrumental"]))
+        if cfg.backend == "managed":
+            raise RuntimeError("no bundled separator runtime is available")
+
+    cfg = resolve_separator_config(cfg)
 
     if cfg.backend == "none":
         vocals.write_bytes(input_wav.read_bytes())
@@ -101,6 +125,28 @@ def convert_vocal(vocals: Path, out_dir: Path, cfg: ConversionConfig, workdir: P
     output = out_dir / "converted_vocal.wav"
     if cfg.backend == "passthrough":
         output.write_bytes(vocals.read_bytes())
+    elif cfg.backend == "managed":
+        manager = BackendRuntimeManager()
+        runtime_backend = manager.select_conversion_backend(cfg.runtime_backend)
+        result = manager.invoke(
+            runtime_backend,
+            "convert",
+            {
+                "input": str(vocals),
+                "output": str(output),
+                "model_path": str(cfg.model_path) if cfg.model_path else None,
+                "index_path": str(cfg.index_path) if cfg.index_path else None,
+                "simple_profile_path": str(cfg.simple_profile_path) if cfg.simple_profile_path else None,
+                "f0_method": cfg.f0_method,
+                "transpose": cfg.transpose,
+                "protect": cfg.protect,
+                "index_rate": cfg.index_rate,
+                "rms_mix_rate": cfg.rms_mix_rate,
+                "workdir": str(workdir),
+                "extra_args": cfg.extra_args,
+            },
+        )
+        output = Path(result.get("output") or output)
     elif cfg.backend == "simple-timbre":
         if not cfg.simple_profile_path:
             raise ValueError("simple-timbre conversion requires simple_profile_path")

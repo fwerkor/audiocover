@@ -4,6 +4,17 @@ import sys
 from pathlib import Path
 
 ROOT = Path(SPECPATH).resolve().parent
+RUNTIME_DIR = ROOT / 'backend-runtimes'
+
+datas = [
+    (str(ROOT / 'configs'), 'configs'),
+    (str(ROOT / 'profiles' / 'example.yaml'), 'profiles'),
+    (str(ROOT / 'README.md'), '.'),
+    (str(ROOT / 'NOTICE.md'), '.'),
+    (str(ROOT / 'LICENSE'), '.'),
+]
+if RUNTIME_DIR.exists():
+    datas.append((str(RUNTIME_DIR), 'backend-runtimes'))
 
 block_cipher = None
 
@@ -11,13 +22,7 @@ a = Analysis(
     [str(ROOT / 'src' / 'audiocover' / 'gui.py')],
     pathex=[str(ROOT), str(ROOT / 'src')],
     binaries=[],
-    datas=[
-        (str(ROOT / 'configs'), 'configs'),
-        (str(ROOT / 'profiles' / 'example.yaml'), 'profiles'),
-        (str(ROOT / 'README.md'), '.'),
-        (str(ROOT / 'NOTICE.md'), '.'),
-        (str(ROOT / 'LICENSE'), '.'),
-    ],
+    datas=datas,
     hiddenimports=[
         'audiocover',
         'audiocover.cli',
@@ -26,8 +31,10 @@ a = Analysis(
         'audiocover.dataset',
         'audiocover.training',
         'audiocover.pipeline',
+        'audiocover.runtime',
         'audiocover.simple_timbre',
         'audiocover.qc',
+        'audiocover.workers',
         'pyloudnorm',
         'soundfile',
         'scipy.signal',

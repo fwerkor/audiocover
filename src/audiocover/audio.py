@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 import shutil
 import subprocess
+from math import gcd
 from pathlib import Path
 
 import numpy as np
@@ -81,9 +82,10 @@ def load_audio(path: Path, sr: int | None = None, mono: bool = False) -> tuple[n
     if mono:
         data = np.mean(data, axis=1, keepdims=True)
     if sr is not None and file_sr != sr:
-        import librosa
-
-        channels = [librosa.resample(data[:, i], orig_sr=file_sr, target_sr=sr) for i in range(data.shape[1])]
+        divisor = gcd(file_sr, sr)
+        up = sr // divisor
+        down = file_sr // divisor
+        channels = [signal.resample_poly(data[:, i], up, down) for i in range(data.shape[1])]
         min_len = min(len(x) for x in channels)
         data = np.stack([x[:min_len] for x in channels], axis=1).astype(np.float32)
         file_sr = sr

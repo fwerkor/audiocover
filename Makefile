@@ -1,4 +1,4 @@
-.PHONY: install dev test lint compile build-gui
+.PHONY: install dev test lint compile build-gui build-desktop
 
 install:
 	python -m pip install -e .
@@ -15,5 +15,7 @@ lint:
 compile:
 	python -m compileall src tests
 
-build-gui:
-	pyinstaller packaging/audiocover-gui.spec --clean --noconfirm
+build-gui: build-desktop
+
+build-desktop:
+	python scripts/build_desktop.py

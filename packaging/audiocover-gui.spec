@@ -1,17 +1,22 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import sys
+from pathlib import Path
+
+ROOT = Path(SPECPATH).resolve().parent
+
 block_cipher = None
 
 a = Analysis(
-    ['src/audiocover/gui.py'],
-    pathex=['.'],
+    [str(ROOT / 'src' / 'audiocover' / 'gui.py')],
+    pathex=[str(ROOT), str(ROOT / 'src')],
     binaries=[],
     datas=[
-        ('configs', 'configs'),
-        ('profiles/example.yaml', 'profiles'),
-        ('README.md', '.'),
-        ('NOTICE.md', '.'),
-        ('LICENSE', '.'),
+        (str(ROOT / 'configs'), 'configs'),
+        (str(ROOT / 'profiles' / 'example.yaml'), 'profiles'),
+        (str(ROOT / 'README.md'), '.'),
+        (str(ROOT / 'NOTICE.md'), '.'),
+        (str(ROOT / 'LICENSE'), '.'),
     ],
     hiddenimports=[
         'audiocover',
@@ -23,7 +28,6 @@ a = Analysis(
         'audiocover.pipeline',
         'audiocover.simple_timbre',
         'audiocover.qc',
-        'librosa',
         'pyloudnorm',
         'soundfile',
         'scipy.signal',
@@ -31,7 +35,19 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['matplotlib', 'notebook', 'IPython'],
+    excludes=[
+        'IPython',
+        'librosa',
+        'llvmlite',
+        'matplotlib',
+        'notebook',
+        'numba',
+        'pandas',
+        'pyarrow',
+        'pytest',
+        'sklearn',
+        'torch',
+    ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
@@ -68,3 +84,11 @@ coll = COLLECT(
     upx_exclude=[],
     name='AudioCover',
 )
+
+if sys.platform == 'darwin':
+    app = BUNDLE(
+        coll,
+        name='AudioCover.app',
+        icon=None,
+        bundle_identifier='com.fwerkor.audiocover',
+    )

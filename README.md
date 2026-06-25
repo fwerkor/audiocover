@@ -1,43 +1,45 @@
 # AudioCover
 
 <p align="center">
-  <strong>Windows GUI and CLI for training a voice profile and rendering audio covers.</strong>
+  <strong>Desktop GUI and CLI for training a voice profile and rendering audio covers.</strong>
 </p>
 
 <p align="center">
   <a href="https://github.com/fwerkor/audiocover/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/fwerkor/audiocover/actions/workflows/ci.yml/badge.svg"></a>
-  <a href="https://github.com/fwerkor/audiocover/actions/workflows/release.yml"><img alt="Release" src="https://github.com/fwerkor/audiocover/actions/workflows/release.yml/badge.svg"></a>
 </p>
 
 AudioCover packages a practical cover-rendering workflow:
 
 1. prepare authorized voice recordings;
 2. train or register a target voice profile;
-3. split a song into vocals and instrumental stems;
+3. split a song into vocal and instrumental stems;
 4. convert the vocal through a selected backend;
 5. polish, mix, and export `final_mix.wav` with reports and intermediate files.
 
-It includes a Tkinter desktop GUI, a command-line interface, a model-package format, CI tests, and a Windows release build. The built-in `simple-timbre` backend is a lightweight local fallback for testing the full pipeline without GPU-only dependencies. For higher quality results, connect an external RVC/Seed-VC/So-VITS-style backend with command templates.
+It includes a Tkinter desktop GUI, a command-line interface, a model-package format, automated tests, and a PyInstaller build path. The built-in `simple-timbre` backend is a lightweight local fallback for testing the full pipeline without GPU-only dependencies. For higher quality results, connect an external RVC, Seed-VC, So-VITS, or similar backend with command templates.
 
 No songs, private datasets, model weights, or third-party model repositories are included.
 
 ## Features
 
-- Windows-friendly desktop GUI: `audiocover-gui`
+- Desktop GUI: `audiocover-gui`
 - CLI entry point: `audiocover`
 - Dataset preparation with audio QC reports
 - Reproducible `model.yaml` profile packages
 - Built-in CPU-testable fallback backend
-- External backend adapters for serious training/inference stacks
-- PyInstaller packaging for Windows releases
-- GitHub Actions CI and release automation
+- External backend adapters for serious training and inference stacks
+- PyInstaller packaging for desktop bundles
 
 ## Install for development
 
 ```bash
 python -m venv .venv
-.venv\Scripts\activate  # Windows
-# source .venv/bin/activate  # Linux/macOS
+
+# Windows PowerShell
+.venv\Scripts\Activate.ps1
+
+# Linux/macOS
+source .venv/bin/activate
 
 python -m pip install -U pip
 python -m pip install -e ".[dev]"
@@ -123,7 +125,7 @@ audiocover doctor
 
 ## External backend configuration
 
-External backends are configured with command templates. This keeps AudioCover independent from any specific VC framework while still supporting serious training and inference implementations.
+External backends are configured with command templates. This keeps AudioCover independent from any specific voice-conversion framework while still supporting serious training and inference implementations.
 
 Example conversion section in `model.yaml`:
 
@@ -131,7 +133,7 @@ Example conversion section in `model.yaml`:
 conversion:
   backend: external
   command_template: >
-    python C:/tools/rvc_cli/infer.py
+    python path/to/rvc_cli/infer.py
     --input {input}
     --output {output}
     --model {model}
@@ -159,9 +161,9 @@ Example external training config:
 training:
   backend: external
   commands:
-    - python C:/tools/rvc_cli/preprocess.py --dataset {dataset} --out {workdir}
-    - python C:/tools/rvc_cli/train.py --dataset {dataset} --out {workdir} --epochs {epochs}
-    - python C:/tools/rvc_cli/build_index.py --model {model} --out {index}
+    - python path/to/rvc_cli/preprocess.py --dataset {dataset} --out {workdir}
+    - python path/to/rvc_cli/train.py --dataset {dataset} --out {workdir} --epochs {epochs}
+    - python path/to/rvc_cli/build_index.py --model {model} --out {index}
 ```
 
 Training placeholders:
@@ -184,43 +186,18 @@ python -m pip install -e ".[build]"
 python -m build
 ```
 
-Build the Windows GUI executable on Windows:
-
-```powershell
-python -m pip install -e ".[build]"
-pyinstaller packaging/audiocover-gui.spec --clean --noconfirm
-```
-
-Output:
-
-```text
-dist/AudioCover/AudioCover.exe
-```
-
-## Release
-
-The release workflow can run in two ways.
-
-### From the GitHub web UI
-
-1. Open **Actions**.
-2. Select **release**.
-3. Click **Run workflow**.
-4. Enter a tag name such as `v0.2.0`.
-5. Choose whether it is a prerelease.
-
-The workflow builds the Python package and the Windows GUI ZIP, then creates a GitHub Release.
-
-### From git tags
+Build a desktop bundle:
 
 ```bash
-git tag v0.2.0
-git push origin v0.2.0
+python -m pip install -e ".[build]"
+python scripts/build_desktop.py
 ```
+
+Output is written under `dist/`.
 
 ## Recording recommendations
 
-- WAV/FLAC/MP3/M4A inputs supported through FFmpeg
+- WAV, FLAC, MP3, M4A, AAC, and OGG inputs are supported through FFmpeg
 - dry voice without background music
 - 48 kHz preferred
 - avoid clipping and heavy room echo

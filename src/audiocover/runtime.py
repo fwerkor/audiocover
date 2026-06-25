@@ -80,7 +80,7 @@ def _runtime_roots() -> list[Path]:
 
 def _exe_names(worker_name: str) -> tuple[str, ...]:
     if sys.platform.startswith("win"):
-        return (f"{worker_name}.exe", worker_name)
+        return (f"{worker_name}.exe", f"{worker_name}.cmd", f"{worker_name}.bat", worker_name)
     return (worker_name, f"{worker_name}.exe")
 
 

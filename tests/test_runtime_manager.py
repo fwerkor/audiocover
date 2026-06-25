@@ -50,15 +50,24 @@ def test_managed_training_uses_runtime_worker(tmp_path: Path) -> None:
 def test_frozen_worker_protocol_when_runtime_dir_is_supplied(tmp_path: Path) -> None:
     runtime = tmp_path / "backend-runtimes" / "simple-timbre"
     runtime.mkdir(parents=True)
-    worker = runtime / ("simple-timbre.exe" if os.name == "nt" else "simple-timbre")
-    worker.write_text(
-        "#!/usr/bin/env python3\n"
-        "import json, sys\n"
-        "req=json.loads(sys.stdin.read())\n"
-        "print(json.dumps({'id': req['id'], 'ok': True, 'result': {'available': True, 'actions': ['train'], 'description': 'fake'}}))\n",
-        encoding="utf-8",
-    )
-    worker.chmod(0o755)
+    if os.name == "nt":
+        worker = runtime / "simple-timbre.cmd"
+        worker.write_text(
+            "@echo off\r\n"
+            "python -c \"import json,sys; req=json.load(sys.stdin); print(json.dumps({'id': req['id'], 'ok': True, 'result': {'available': True, 'actions': ['train'], 'description': 'fake'}}))\"\r\n",
+            encoding="utf-8",
+        )
+    else:
+        worker = runtime / "simple-timbre"
+        worker.write_text(
+            "#!/usr/bin/env python3\n"
+            "import json, sys\n"
+            "req=json.loads(sys.stdin.read())\n"
+            "print(json.dumps({'id': req['id'], 'ok': True, 'result': {'available': True, 'actions': ['train'], 'description': 'fake'}}))\n",
+            encoding="utf-8",
+        )
+        worker.chmod(0o755)
+
 
     manager = BackendRuntimeManager(runtime_roots=[tmp_path / "backend-runtimes"])
     cap = manager.capabilities("simple-timbre")

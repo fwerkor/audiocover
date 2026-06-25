@@ -1,2 +1,2 @@
 @echo off
-python -m audiocover_lab.gui
+python -m audiocover.gui

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from audiocover_lab.config import ModelPackage, RenderConfig, TrainingConfig
+from audiocover.config import ModelPackage, RenderConfig, TrainingConfig
 
 
 def test_config_loads() -> None:

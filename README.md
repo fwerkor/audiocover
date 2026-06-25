@@ -1,4 +1,4 @@
-# AudioCover Lab
+# AudioCover
 
 <p align="center">
   <strong>Windows GUI and CLI for training a voice profile and rendering audio covers.</strong>
@@ -9,7 +9,7 @@
   <a href="https://github.com/fwerkor/audiocover/actions/workflows/release.yml"><img alt="Release" src="https://github.com/fwerkor/audiocover/actions/workflows/release.yml/badge.svg"></a>
 </p>
 
-AudioCover Lab packages a practical cover-rendering workflow:
+AudioCover packages a practical cover-rendering workflow:
 
 1. prepare authorized voice recordings;
 2. train or register a target voice profile;
@@ -54,7 +54,7 @@ audiocover-gui
 or:
 
 ```bash
-python -m audiocover_lab.gui
+python -m audiocover.gui
 ```
 
 ## GUI workflow
@@ -123,7 +123,7 @@ audiocover doctor
 
 ## External backend configuration
 
-External backends are configured with command templates. This keeps AudioCover Lab independent from any specific VC framework while still supporting serious training and inference implementations.
+External backends are configured with command templates. This keeps AudioCover independent from any specific VC framework while still supporting serious training and inference implementations.
 
 Example conversion section in `model.yaml`:
 
@@ -194,7 +194,7 @@ pyinstaller packaging/audiocover-gui.spec --clean --noconfirm
 Output:
 
 ```text
-dist/AudioCoverLab/AudioCoverLab.exe
+dist/AudioCover/AudioCover.exe
 ```
 
 ## Release

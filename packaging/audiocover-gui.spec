@@ -3,7 +3,7 @@
 block_cipher = None
 
 a = Analysis(
-    ['src/audiocover_lab/gui.py'],
+    ['src/audiocover/gui.py'],
     pathex=['.'],
     binaries=[],
     datas=[
@@ -14,15 +14,15 @@ a = Analysis(
         ('LICENSE', '.'),
     ],
     hiddenimports=[
-        'audiocover_lab',
-        'audiocover_lab.cli',
-        'audiocover_lab.config',
-        'audiocover_lab.audio',
-        'audiocover_lab.dataset',
-        'audiocover_lab.training',
-        'audiocover_lab.pipeline',
-        'audiocover_lab.simple_timbre',
-        'audiocover_lab.qc',
+        'audiocover',
+        'audiocover.cli',
+        'audiocover.config',
+        'audiocover.audio',
+        'audiocover.dataset',
+        'audiocover.training',
+        'audiocover.pipeline',
+        'audiocover.simple_timbre',
+        'audiocover.qc',
         'librosa',
         'pyloudnorm',
         'soundfile',
@@ -45,7 +45,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='AudioCoverLab',
+    name='AudioCover',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -66,5 +66,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='AudioCoverLab',
+    name='AudioCover',
 )

@@ -1,6 +1,6 @@
 # Architecture
 
-AudioCover Lab has two user-facing entry points:
+AudioCover has two user-facing entry points:
 
 - CLI: `audiocover`
 - Windows GUI: `audiocover-gui`

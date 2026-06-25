@@ -1,6 +1,6 @@
 # External backends
 
-AudioCover Lab does not vendor third-party SVC/RVC engines. It invokes them through command templates.
+AudioCover does not vendor third-party SVC/RVC engines. It invokes them through command templates.
 
 ## External training
 
@@ -35,4 +35,4 @@ conversion:
     --f0_method {f0_method}
 ```
 
-This keeps AudioCover Lab stable even when third-party CLIs change.
+This keeps AudioCover stable even when third-party CLIs change.

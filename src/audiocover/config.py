@@ -93,7 +93,7 @@ class ModelPackage(BaseModel):
     simple_profile_path: Path | None = None
     transpose: int = 0
     f0_method: str = "rmvpe"
-    created_by: str = "audiocover-lab"
+    created_by: str = "audiocover"
     notes: str | None = None
 
     @classmethod

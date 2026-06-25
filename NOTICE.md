@@ -1,6 +1,6 @@
 # Notice
 
-AudioCover Lab is an orchestration and local training framework. It does not include copyrighted songs, private recordings, pretrained third-party weights, or third-party model source code.
+AudioCover is an orchestration and local training framework. It does not include copyrighted songs, private recordings, pretrained third-party weights, or third-party model source code.
 
 Third-party engines such as RVC, Seed-VC, So-VITS-SVC, Demucs, UVR, FFmpeg, and PyTorch have their own licenses and requirements. Verify them before distribution.
 

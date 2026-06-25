@@ -3,9 +3,9 @@ from pathlib import Path
 import numpy as np
 import soundfile as sf
 
-from audiocover_lab.config import RenderConfig, TrainingConfig
-from audiocover_lab.pipeline import render_cover
-from audiocover_lab.training import train_model
+from audiocover.config import RenderConfig, TrainingConfig
+from audiocover.pipeline import render_cover
+from audiocover.training import train_model
 
 
 def _write_tone(path: Path, freq: float, seconds: float = 2.5, sr: int = 48000) -> None:

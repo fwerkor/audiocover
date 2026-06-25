@@ -1,6 +1,6 @@
 import numpy as np
 
-from audiocover_lab.audio import limiter, match_channels, match_length, normalize_lufs, peak_dbfs
+from audiocover.audio import limiter, match_channels, match_length, normalize_lufs, peak_dbfs
 
 
 def test_match_channels_and_length() -> None:

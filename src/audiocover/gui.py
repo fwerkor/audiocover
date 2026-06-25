@@ -33,7 +33,7 @@ class Worker:
 class AudioCoverGui:
     def __init__(self) -> None:
         self.root = Tk()
-        self.root.title("AudioCover Lab")
+        self.root.title("AudioCover")
         self.root.geometry("920x720")
         self.log_queue: queue.Queue[str] = queue.Queue()
         self.worker = Worker(self.log_queue)

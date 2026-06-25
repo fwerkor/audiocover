@@ -3,7 +3,7 @@ requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"
 
 [project]
-name = "audiocover-lab"
+name = "audiocover"
 version = "0.2.0"
 description = "Windows GUI and CLI for training target profiles and rendering audio covers."
 readme = "README.md"
@@ -48,11 +48,11 @@ build = [
 ]
 
 [project.scripts]
-audiocover = "audiocover_lab.cli:app"
-audiocover-gui = "audiocover_lab.gui:main"
+audiocover = "audiocover.cli:app"
+audiocover-gui = "audiocover.gui:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/audiocover_lab"]
+packages = ["src/audiocover"]
 
 [tool.ruff]
 line-length = 100

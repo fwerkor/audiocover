@@ -13,7 +13,7 @@ from .training import train_model
 
 
 class Worker:
-    def __init__(self, log_queue: "queue.Queue[str]") -> None:
+    def __init__(self, log_queue: queue.Queue[str]) -> None:
         self.log_queue = log_queue
 
     def run(self, title: str, target, *args, **kwargs) -> None:

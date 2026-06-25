@@ -77,7 +77,7 @@ class RenderConfig(BaseModel):
     overwrite: bool = False
 
     @classmethod
-    def from_yaml(cls, path: Path) -> "RenderConfig":
+    def from_yaml(cls, path: Path) -> RenderConfig:
         return cls.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")) or {})
 
     def to_yaml(self) -> str:
@@ -97,13 +97,13 @@ class ModelPackage(BaseModel):
     notes: str | None = None
 
     @classmethod
-    def from_yaml(cls, path: Path) -> "ModelPackage":
+    def from_yaml(cls, path: Path) -> ModelPackage:
         data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
         base_dir = path.parent
         obj = cls.model_validate(data)
         return obj.resolve_relative_paths(base_dir)
 
-    def resolve_relative_paths(self, base_dir: Path) -> "ModelPackage":
+    def resolve_relative_paths(self, base_dir: Path) -> ModelPackage:
         data = self.model_dump()
         for key in ("model_path", "index_path", "simple_profile_path"):
             value = getattr(self, key)

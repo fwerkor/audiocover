@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import shutil
 from pathlib import Path
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -17,6 +18,7 @@ from .training import train_model
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 console = Console()
+DEFAULT_RENDER_CONFIG_PATH = default_config_path()
 
 
 @app.command()
@@ -43,7 +45,7 @@ def doctor() -> None:
 def prepare_dataset(
     input_dir: Path,
     output_dir: Path,
-    segment_seconds: float = typer.Option(12.0, min=2.0, max=30.0),
+    segment_seconds: Annotated[float, typer.Option(min=2.0, max=30.0)] = 12.0,
     sample_rate: int = 48000,
 ) -> None:
     report = prepare_dataset_impl(input_dir, output_dir, segment_seconds=segment_seconds, sample_rate=sample_rate)
@@ -55,14 +57,14 @@ def prepare_dataset(
 def train(
     raw_data_dir: Path,
     output_dir: Path,
-    display_name: str = typer.Option("my_profile", "--name"),
-    backend: str = typer.Option("simple-timbre", "--backend"),
+    display_name: Annotated[str, typer.Option("--name")] = "my_profile",
+    backend: Annotated[str, typer.Option("--backend")] = "simple-timbre",
     sample_rate: int = 48000,
     segment_seconds: float = 12.0,
     epochs: int = 200,
     batch_size: int = 8,
-    command: list[str] = typer.Option(None, "--command", help="External training command. May be repeated."),
-    consent: bool = typer.Option(False, "--consent", help="Confirm that you own or are authorized to use the data."),
+    command: Annotated[list[str] | None, typer.Option("--command", help="External training command. May be repeated.")] = None,
+    consent: Annotated[bool, typer.Option("--consent", help="Confirm that you own or are authorized to use the data.")] = False,
 ) -> None:
     cfg = TrainingConfig(
         backend=backend,
@@ -80,11 +82,11 @@ def train(
 @app.command()
 def render(
     input_song: Path,
-    model: Path = typer.Option(..., "--model", "-m", help="Path to model.yaml."),
-    out: Path = typer.Option(..., "--out", "-o", help="Output run directory."),
-    config: Path = typer.Option(default_config_path(), "--config", "-c"),
-    overwrite: bool = typer.Option(False, "--overwrite"),
-    consent: bool = typer.Option(False, "--consent", help="Confirm that you have rights to use the song/model."),
+    model: Annotated[Path, typer.Option("--model", "-m", help="Path to model.yaml.")],
+    out: Annotated[Path, typer.Option("--out", "-o", help="Output run directory.")],
+    config: Annotated[Path, typer.Option("--config", "-c")] = DEFAULT_RENDER_CONFIG_PATH,
+    overwrite: Annotated[bool, typer.Option("--overwrite")] = False,
+    consent: Annotated[bool, typer.Option("--consent", help="Confirm that you have rights to use the song/model.")] = False,
 ) -> None:
     cfg = RenderConfig.from_yaml(config)
     cfg.overwrite = cfg.overwrite or overwrite
@@ -94,7 +96,7 @@ def render(
 
 
 @app.command()
-def qc(path: Path, json_out: Path | None = typer.Option(None, "--json-out")) -> None:
+def qc(path: Path, json_out: Annotated[Path | None, typer.Option("--json-out")] = None) -> None:
     report = analyze_audio(path)
     if json_out:
         json_out.parent.mkdir(parents=True, exist_ok=True)

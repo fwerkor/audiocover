@@ -7,7 +7,6 @@ from pathlib import Path
 
 from .audio import (
     biquad_filter,
-    convert_to_wav,
     db_to_gain,
     deess,
     limiter,
@@ -75,7 +74,7 @@ def separate(input_wav: Path, out_dir: Path, cfg: SeparatorConfig) -> Stems:
         cmd.insert(-2, "--segment")
     cmd.extend(cfg.extra_args)
 
-    process = subprocess.run(cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    process = subprocess.run(cmd, text=True, capture_output=True)
     (out_dir / "demucs.log").write_text(
         "COMMAND\n" + " ".join(cmd) + "\n\nSTDOUT\n" + process.stdout + "\n\nSTDERR\n" + process.stderr,
         encoding="utf-8",

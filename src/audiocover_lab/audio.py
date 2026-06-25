@@ -23,7 +23,7 @@ def peak_dbfs(data: np.ndarray) -> float:
 
 
 def run_command(args: list[str], *, log_file: Path | None = None) -> None:
-    process = subprocess.run(args, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    process = subprocess.run(args, text=True, capture_output=True)
     if log_file:
         log_file.parent.mkdir(parents=True, exist_ok=True)
         log_file.write_text(
@@ -45,6 +45,14 @@ def require_ffmpeg() -> None:
 
 
 def convert_to_wav(src: Path, dst: Path, sample_rate: int = 48000, channels: int = 2) -> Path:
+    if src.suffix.lower() in {".wav", ".flac", ".ogg"}:
+        try:
+            data, sr = load_audio(src, sr=sample_rate, mono=channels == 1)
+            data = match_channels(data, channels)
+            return write_audio(dst, data, sr, subtype="PCM_24")
+        except Exception:
+            pass
+
     require_ffmpeg()
     dst.parent.mkdir(parents=True, exist_ok=True)
     run_command(

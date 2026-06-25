@@ -1,15 +1,21 @@
 from __future__ import annotations
 
 import queue
+import sys
 import threading
 import traceback
 from pathlib import Path
-from tkinter import BooleanVar, StringVar, Tk, filedialog, messagebox, ttk
-from tkinter.scrolledtext import ScrolledText
 
-from .config import RenderConfig, TrainingConfig, default_config_path
-from .pipeline import render_cover
-from .training import train_model
+from audiocover.config import RenderConfig, TrainingConfig, default_config_path
+from audiocover.pipeline import render_cover
+from audiocover.training import train_model
+
+
+def _load_tk() -> None:
+    global BooleanVar, ScrolledText, StringVar, Tk, filedialog, messagebox, ttk
+
+    from tkinter import BooleanVar, StringVar, Tk, filedialog, messagebox, ttk
+    from tkinter.scrolledtext import ScrolledText
 
 
 class Worker:
@@ -32,6 +38,7 @@ class Worker:
 
 class AudioCoverGui:
     def __init__(self) -> None:
+        _load_tk()
         self.root = Tk()
         self.root.title("AudioCover")
         self.root.geometry("920x720")
@@ -181,6 +188,8 @@ class AudioCoverGui:
 
 
 def main() -> None:
+    if "--smoke-test" in sys.argv:
+        return
     AudioCoverGui().run()
 
 

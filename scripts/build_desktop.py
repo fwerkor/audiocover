@@ -9,6 +9,7 @@ import platform
 import shutil
 import subprocess
 from pathlib import Path
+from typing import NoReturn
 
 ROOT = Path(__file__).resolve().parents[1]
 DIST_DIR = ROOT / "dist"
@@ -45,6 +46,26 @@ def _run(command: list[str]) -> None:
     subprocess.run(command, cwd=ROOT, check=True)
 
 
+def _fail(message: str) -> NoReturn:
+    raise SystemExit(message)
+
+
+def _bundle_executable() -> Path:
+    system = _normalize_system(platform.system())
+    if system == "windows":
+        return APP_DIR / "AudioCover.exe"
+    if system == "macos" and MAC_APP_DIR.exists():
+        return MAC_APP_DIR / "Contents" / "MacOS" / "AudioCover"
+    return APP_DIR / "AudioCover"
+
+
+def smoke_test_bundle() -> None:
+    executable = _bundle_executable()
+    if not executable.exists():
+        raise FileNotFoundError(f"Desktop executable was not found: {executable}")
+    _run([str(executable), "--smoke-test"])
+
+
 def build_bundle(clean: bool) -> None:
     if clean:
         shutil.rmtree(DIST_DIR, ignore_errors=True)
@@ -60,10 +81,10 @@ def package_bundle() -> Path:
     artifact_base = DIST_DIR / f"audiocover-{system}-{machine}"
 
     package_dir = MAC_APP_DIR if MAC_APP_DIR.exists() else APP_DIR
-    if system == "windows":
-        artifact = Path(shutil.make_archive(str(artifact_base), "zip", root_dir=DIST_DIR, base_dir=package_dir.name))
-    else:
-        artifact = Path(shutil.make_archive(str(artifact_base), "gztar", root_dir=DIST_DIR, base_dir=package_dir.name))
+    archive_format = "zip" if system == "windows" else "gztar"
+    artifact = Path(
+        shutil.make_archive(str(artifact_base), archive_format, root_dir=DIST_DIR, base_dir=package_dir.name)
+    )
 
     print(f"Built {artifact.relative_to(ROOT)}", flush=True)
     github_output = os.environ.get("GITHUB_OUTPUT")
@@ -76,9 +97,21 @@ def package_bundle() -> Path:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--no-clean", action="store_true", help="reuse existing build directories")
+    parser.add_argument(
+        "--smoke-test-only",
+        action="store_true",
+        help="run the frozen executable smoke test without rebuilding",
+    )
     args = parser.parse_args()
 
+    if args.smoke_test_only:
+        if not (APP_DIR.exists() or MAC_APP_DIR.exists()):
+            _fail("No existing desktop bundle found; build it before running --smoke-test-only")
+        smoke_test_bundle()
+        return
+
     build_bundle(clean=not args.no_clean)
+    smoke_test_bundle()
     package_bundle()
 
 

@@ -36,6 +36,11 @@ gpu = [
   "torchaudio>=2.2.0",
   "demucs>=4.0.1",
 ]
+full = [
+  "torch>=2.2.0",
+  "torchaudio>=2.2.0",
+  "demucs>=4.0.1",
+]
 dev = [
   "pytest>=8.2.0",
   "ruff>=0.6.0",

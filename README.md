@@ -6,6 +6,7 @@ AudioCover is a desktop GUI and CLI for local audio-cover workflows. It prepares
 
 - Desktop GUI for training data, model package, song input, output folder, and rights confirmation.
 - Automatic backend runtime selection without a user-facing backend picker.
+- Automatic octave-level pitch range adaptation from the trained voice profile.
 - Isolated backend workers that communicate with the main app through JSON stdin/stdout.
 - Split backend runtime packs for large or conflicting engines.
 - CLI commands for dataset preparation, training, rendering, quality checks, and diagnostics.
@@ -145,11 +146,14 @@ my_voice_dataset/
   003.wav
 ```
 
-Training produces a model package such as:
+Training produces a model package and pitch profile such as:
 
 ```text
 models/my_voice/model.yaml
+models/my_voice/voice_profile.json
 ```
+
+`voice_profile.json` stores the target voice F0 range. During rendering, AudioCover analyzes the separated input vocal and automatically chooses an octave-level pitch shift from `-12`, `0`, or `+12` semitones when the selected backend supports transpose. The render report records the decision in `reports/auto_pitch.json`.
 
 Rendering uses that `model.yaml` plus a song file and writes the final audio, intermediates, and JSON reports into the selected output folder.
 

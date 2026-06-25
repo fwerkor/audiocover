@@ -7,6 +7,7 @@ from pathlib import Path
 from .config import ConversionConfig, ModelPackage, TrainingConfig, resolve_training_config
 from .dataset import prepare_dataset
 from .external import run_template
+from .pitch import build_voice_profile
 from .runtime import BackendRuntimeManager
 from .simple_timbre import train_simple_timbre
 
@@ -30,6 +31,7 @@ def _package_from_runtime(
     output_dir: Path,
     runtime_backend: str,
     result: dict,
+    voice_profile_path: Path | None = None,
 ) -> ModelPackage:
     simple_profile = _relative_to_output(result.get("simple_profile_path"), output_dir)
     model_path = _relative_to_output(result.get("model_path"), output_dir)
@@ -61,6 +63,7 @@ def _package_from_runtime(
         config_path=config_path,
         cluster_model_path=cluster_model_path,
         simple_profile_path=simple_profile,
+        voice_profile_path=voice_profile_path.name if voice_profile_path else None,
         speaker=str(speaker) if speaker else None,
         f0_method=config.f0_method,
         notes=result.get("notes"),
@@ -93,6 +96,26 @@ def train_model(
     )
     if not report["items"]:
         raise RuntimeError("dataset preparation produced no usable audio segments")
+
+    voice_profile_path = output_dir / "voice_profile.json"
+    if log:
+        log("analyzing target voice pitch range")
+    voice_profile = build_voice_profile(
+        dataset_dir / "wavs",
+        voice_profile_path,
+        sample_rate=config.sample_rate,
+        display_name=display_name,
+    )
+    if log:
+        if voice_profile.get("valid"):
+            log(
+                "target pitch profile: "
+                f"p10={voice_profile['f0_p10_hz']} Hz, "
+                f"median={voice_profile['f0_median_hz']} Hz, "
+                f"p90={voice_profile['f0_p90_hz']} Hz"
+            )
+        else:
+            log("target pitch profile: insufficient voiced pitch data; auto pitch adaptation may be skipped")
 
     if config.backend == "managed":
         manager = BackendRuntimeManager()
@@ -128,6 +151,7 @@ def train_model(
             output_dir=output_dir,
             runtime_backend=runtime_backend,
             result=result,
+            voice_profile_path=voice_profile_path,
         )
     elif config.backend == "simple-timbre":
         if log:
@@ -142,6 +166,7 @@ def train_model(
                 f0_method=config.f0_method,
             ),
             simple_profile_path=simple_profile.name,
+            voice_profile_path=voice_profile_path.name,
             f0_method=config.f0_method,
             notes="Built-in lightweight model. Use a managed runtime package for backend-specific models.",
         )
@@ -172,6 +197,7 @@ def train_model(
             ),
             model_path=model_path.name if model_path.exists() else None,
             index_path=index_path.name if index_path.exists() else None,
+            voice_profile_path=voice_profile_path.name,
             f0_method=config.f0_method,
             notes="External backend model package.",
         )
@@ -183,7 +209,15 @@ def train_model(
         log(f"writing model package: {model_yaml}")
     package.write_yaml(model_yaml)
     (output_dir / "training_report.json").write_text(
-        json.dumps({"model_yaml": str(model_yaml), "dataset_report": report}, ensure_ascii=False, indent=2),
+        json.dumps(
+            {
+                "model_yaml": str(model_yaml),
+                "dataset_report": report,
+                "voice_profile": voice_profile,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
         encoding="utf-8",
     )
     if log:

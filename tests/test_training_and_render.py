@@ -29,6 +29,8 @@ def test_train_simple_and_render_debug(tmp_path: Path) -> None:
         consent=True,
     )
     assert (model_dir / "model.yaml").exists()
+    assert (model_dir / "voice_profile.json").exists()
+    assert package.voice_profile_path == model_dir / "voice_profile.json"
     assert package.conversion.backend == "simple-timbre"
 
     song = tmp_path / "song.wav"
@@ -42,6 +44,8 @@ def test_train_simple_and_render_debug(tmp_path: Path) -> None:
     manifest = render_cover(song, model_dir / "model.yaml", tmp_path / "run", config=cfg, consent=True)
     assert Path(manifest["outputs"]["final_mix"]).exists()
     assert Path(manifest["outputs"]["converted_vocal"]).exists()
+    assert manifest["pitch_adaptation"]["reason"] == "conversion_backend_does_not_support_transpose"
+    assert (tmp_path / "run" / "reports" / "auto_pitch.json").exists()
 
 
 def test_consent_required(tmp_path: Path) -> None:

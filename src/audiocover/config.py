@@ -22,6 +22,7 @@ class SeparatorConfig(BaseModel):
 
 class ConversionConfig(BaseModel):
     backend: Literal["auto", "managed", "external", "passthrough", "simple-timbre"] = "auto"
+    pitch_shift_mode: Literal["auto", "manual"] = "auto"
     runtime_backend: str | None = None
     command_template: str | None = None
     model_path: Path | None = None
@@ -100,6 +101,7 @@ class ModelPackage(BaseModel):
     config_path: Path | None = None
     cluster_model_path: Path | None = None
     simple_profile_path: Path | None = None
+    voice_profile_path: Path | None = None
     speaker: str | None = None
     transpose: int = 0
     f0_method: str = "rmvpe"
@@ -115,7 +117,14 @@ class ModelPackage(BaseModel):
 
     def resolve_relative_paths(self, base_dir: Path) -> ModelPackage:
         data = self.model_dump()
-        for key in ("model_path", "index_path", "config_path", "cluster_model_path", "simple_profile_path"):
+        for key in (
+            "model_path",
+            "index_path",
+            "config_path",
+            "cluster_model_path",
+            "simple_profile_path",
+            "voice_profile_path",
+        ):
             value = getattr(self, key)
             if value is not None and not value.is_absolute():
                 data[key] = base_dir / value

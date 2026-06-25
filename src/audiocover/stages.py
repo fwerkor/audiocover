@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -119,7 +120,14 @@ def separate(input_wav: Path, out_dir: Path, cfg: SeparatorConfig) -> Stems:
     return Stems(vocals, instrumental)
 
 
-def convert_vocal(vocals: Path, out_dir: Path, cfg: ConversionConfig, workdir: Path) -> Converted:
+def convert_vocal(
+    vocals: Path,
+    out_dir: Path,
+    cfg: ConversionConfig,
+    workdir: Path,
+    *,
+    log: Callable[[str], None] | None = None,
+) -> Converted:
     cfg = resolve_conversion_config(cfg)
     out_dir.mkdir(parents=True, exist_ok=True)
     output = out_dir / "converted_vocal.wav"
@@ -148,6 +156,7 @@ def convert_vocal(vocals: Path, out_dir: Path, cfg: ConversionConfig, workdir: P
                 "workdir": str(workdir),
                 "extra_args": cfg.extra_args,
             },
+            log=log,
         )
         output = Path(result.get("output") or output)
     elif cfg.backend == "simple-timbre":

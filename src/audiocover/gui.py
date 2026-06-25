@@ -182,6 +182,7 @@ class AudioCoverGui:
             out_dir,
             config=cfg,
             consent=True,
+            log=lambda message: self.log_queue.put(f"[render] {message}"),
         )
 
     def _poll_logs(self) -> None:

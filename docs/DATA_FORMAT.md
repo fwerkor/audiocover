@@ -2,23 +2,18 @@
 
 ## Training input
 
-A folder containing audio files:
+Select a folder containing `.wav`, `.flac`, `.mp3`, `.m4a`, `.aac`, or `.ogg` files.
 
-- `.wav`
-- `.flac`
-- `.mp3`
-- `.m4a`
-- `.aac`
-- `.ogg`
+Preferred input:
 
-Recommended:
-
-- 48 kHz WAV
-- dry voice
-- no effects
-- no background music
+- authorized data
+- clean dry files
+- stable capture conditions
+- no backing music
 - no clipping
-- stable microphone position
+- 48 kHz WAV when possible
+
+The GUI shows these requirements before training.
 
 ## Model package
 
@@ -38,11 +33,13 @@ models/my_profile/
     report.json
     manifest.jsonl
     wavs/
-  simple_timbre.json   # if backend=simple-timbre
-  model.pth            # if external backend created it
-  model.index          # if external backend created it
+  simple_timbre.json
+  model.pth
+  model.index
 ```
+
+`model.yaml` stores package settings. Normal GUI users do not edit it.
 
 ## Render input
 
-One song file accepted by FFmpeg. Output is always WAV.
+One file accepted by FFmpeg. Output is WAV.

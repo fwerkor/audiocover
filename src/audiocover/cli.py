@@ -58,12 +58,14 @@ def train(
     raw_data_dir: Path,
     output_dir: Path,
     display_name: Annotated[str, typer.Option("--name")] = "my_profile",
-    backend: Annotated[str, typer.Option("--backend")] = "simple-timbre",
-    sample_rate: int = 48000,
-    segment_seconds: float = 12.0,
-    epochs: int = 200,
-    batch_size: int = 8,
-    command: Annotated[list[str] | None, typer.Option("--command", help="External training command. May be repeated.")] = None,
+    backend: Annotated[str, typer.Option("--backend", hidden=True)] = "auto",
+    sample_rate: Annotated[int, typer.Option(hidden=True)] = 48000,
+    segment_seconds: Annotated[float, typer.Option(hidden=True)] = 12.0,
+    epochs: Annotated[int, typer.Option(hidden=True)] = 200,
+    batch_size: Annotated[int, typer.Option(hidden=True)] = 8,
+    command: Annotated[
+        list[str] | None, typer.Option("--command", help="External training command. May be repeated.", hidden=True)
+    ] = None,
     consent: Annotated[bool, typer.Option("--consent", help="Confirm that you own or are authorized to use the data.")] = False,
 ) -> None:
     cfg = TrainingConfig(
@@ -84,7 +86,7 @@ def render(
     input_song: Path,
     model: Annotated[Path, typer.Option("--model", "-m", help="Path to model.yaml.")],
     out: Annotated[Path, typer.Option("--out", "-o", help="Output run directory.")],
-    config: Annotated[Path, typer.Option("--config", "-c")] = DEFAULT_RENDER_CONFIG_PATH,
+    config: Annotated[Path, typer.Option("--config", "-c", hidden=True)] = DEFAULT_RENDER_CONFIG_PATH,
     overwrite: Annotated[bool, typer.Option("--overwrite")] = False,
     consent: Annotated[bool, typer.Option("--consent", help="Confirm that you have rights to use the song/model.")] = False,
 ) -> None:

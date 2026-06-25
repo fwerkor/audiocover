@@ -1,12 +1,12 @@
 separator:
-  backend: demucs
+  backend: auto
   model: htdemucs_ft
-  device: cuda
+  device: auto
   shifts: 8
   overlap: 0.5
   two_stems: vocals
 conversion:
-  backend: external
+  backend: auto
   command_template: null
   f0_method: rmvpe
   transpose: 0

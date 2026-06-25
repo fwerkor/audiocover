@@ -1,4 +1,4 @@
-backend: simple-timbre
+backend: auto
 sample_rate: 48000
 segment_seconds: 12.0
 epochs: 200

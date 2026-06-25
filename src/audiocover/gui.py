@@ -4,6 +4,7 @@ import queue
 import sys
 import threading
 import traceback
+from datetime import datetime
 from pathlib import Path
 
 from audiocover.config import RenderConfig, TrainingConfig, default_config_path
@@ -80,57 +81,64 @@ class AudioCoverGui:
         self.train_data = StringVar()
         self.train_out = StringVar(value=str(Path.cwd() / "models" / "my_profile"))
         self.train_name = StringVar(value="my_profile")
-        self.train_backend = StringVar(value="simple-timbre")
-        self.train_segment = StringVar(value="12")
-        self.train_epochs = StringVar(value="200")
-        self.train_batch = StringVar(value="8")
         self.train_consent = BooleanVar(value=False)
 
         self._entry_row(self.train_frame, 0, "Data folder", self.train_data, lambda: self._choose_dir(self.train_data))
         self._entry_row(self.train_frame, 1, "Output model folder", self.train_out, lambda: self._choose_dir(self.train_out))
         ttk.Label(self.train_frame, text="Display name").grid(row=2, column=0, sticky="w", pady=4)
         ttk.Entry(self.train_frame, textvariable=self.train_name).grid(row=2, column=1, sticky="ew", pady=4)
-        ttk.Label(self.train_frame, text="Backend").grid(row=3, column=0, sticky="w", pady=4)
-        ttk.Combobox(self.train_frame, textvariable=self.train_backend, values=["simple-timbre", "external"], state="readonly").grid(row=3, column=1, sticky="ew", pady=4)
-        ttk.Label(self.train_frame, text="Segment seconds").grid(row=4, column=0, sticky="w", pady=4)
-        ttk.Entry(self.train_frame, textvariable=self.train_segment).grid(row=4, column=1, sticky="ew", pady=4)
-        ttk.Label(self.train_frame, text="Epochs").grid(row=5, column=0, sticky="w", pady=4)
-        ttk.Entry(self.train_frame, textvariable=self.train_epochs).grid(row=5, column=1, sticky="ew", pady=4)
-        ttk.Label(self.train_frame, text="Batch size").grid(row=6, column=0, sticky="w", pady=4)
-        ttk.Entry(self.train_frame, textvariable=self.train_batch).grid(row=6, column=1, sticky="ew", pady=4)
         ttk.Checkbutton(
             self.train_frame,
             text="I own or am authorized to use these recordings.",
             variable=self.train_consent,
-        ).grid(row=7, column=1, sticky="w", pady=8)
-        ttk.Button(self.train_frame, text="Start training", command=self._start_training).grid(row=8, column=1, sticky="e", pady=10)
+        ).grid(row=3, column=1, sticky="w", pady=8)
+        ttk.Button(self.train_frame, text="Start training", command=self._start_training).grid(row=4, column=1, sticky="e", pady=10)
 
-        note = (
-            "For best quality, use external backend commands to call RVC/Seed-VC/So-VITS training. "
-            "The built-in simple-timbre backend is a local fallback and CI-testable model package."
+        data_note = (
+            "Dataset format: choose a folder containing authorized .wav, .flac, .mp3, .m4a, .aac, "
+            "or .ogg files. Use one target speaker, dry isolated voice, stable microphone placement, "
+            "minimal room echo, no background music, and no clipping. 48 kHz WAV is preferred; more "
+            "clean pitch/style coverage improves the final voice profile."
         )
-        ttk.Label(self.train_frame, text=note, wraplength=780).grid(row=9, column=0, columnspan=3, sticky="w", pady=10)
+        ttk.Label(self.train_frame, text=data_note, wraplength=780, justify="left").grid(
+            row=5, column=0, columnspan=3, sticky="w", pady=10
+        )
+
+        backend_note = (
+            "Backend policy: AudioCover decides automatically. It uses the strongest packaged external "
+            "training commands when a model workflow provides them; otherwise it builds the local profile "
+            "needed for an offline, CPU-testable run. No backend choice is required in the GUI."
+        )
+        ttk.Label(self.train_frame, text=backend_note, wraplength=780, justify="left").grid(
+            row=6, column=0, columnspan=3, sticky="w", pady=10
+        )
 
     def _build_render_tab(self) -> None:
         self.song_path = StringVar()
         self.model_yaml = StringVar()
         self.render_out = StringVar(value=str(Path.cwd() / "runs" / "cover"))
-        self.config_path = StringVar(value=str(default_config_path()))
-        self.render_overwrite = BooleanVar(value=True)
         self.render_consent = BooleanVar(value=False)
 
         audio_types = [("Audio files", "*.wav *.flac *.mp3 *.m4a *.aac *.ogg"), ("All files", "*.*")]
         self._entry_row(self.render_frame, 0, "Song file", self.song_path, lambda: self._choose_file(self.song_path, audio_types))
         self._entry_row(self.render_frame, 1, "Model package model.yaml", self.model_yaml, lambda: self._choose_file(self.model_yaml, [("YAML", "*.yaml *.yml"), ("All files", "*.*")]))
         self._entry_row(self.render_frame, 2, "Output folder", self.render_out, lambda: self._choose_dir(self.render_out))
-        self._entry_row(self.render_frame, 3, "Render config", self.config_path, lambda: self._choose_file(self.config_path, [("YAML", "*.yaml *.yml"), ("All files", "*.*")]))
-        ttk.Checkbutton(self.render_frame, text="Overwrite output folder if needed", variable=self.render_overwrite).grid(row=4, column=1, sticky="w", pady=4)
         ttk.Checkbutton(
             self.render_frame,
             text="I have rights/permission to use this song and model.",
             variable=self.render_consent,
-        ).grid(row=5, column=1, sticky="w", pady=8)
-        ttk.Button(self.render_frame, text="Generate cover", command=self._start_render).grid(row=6, column=1, sticky="e", pady=10)
+        ).grid(row=3, column=1, sticky="w", pady=8)
+        ttk.Button(self.render_frame, text="Generate cover", command=self._start_render).grid(row=4, column=1, sticky="e", pady=10)
+
+        render_note = (
+            "Rendering policy: AudioCover uses the built-in high-quality preset. It selects Demucs "
+            "with CUDA, Apple MPS, or CPU automatically when available, lets the model package choose "
+            "the conversion implementation, applies the standard mix/QC chain, and avoids overwriting "
+            "an existing run by creating a timestamped folder when needed."
+        )
+        ttk.Label(self.render_frame, text=render_note, wraplength=780, justify="left").grid(
+            row=5, column=0, columnspan=3, sticky="w", pady=10
+        )
 
     def _build_log_tab(self) -> None:
         self.logs = ScrolledText(self.log_frame, wrap="word")
@@ -141,12 +149,7 @@ class AudioCoverGui:
         if not self.train_consent.get():
             messagebox.showerror("Consent required", "Confirm that you own or are authorized to use the recordings.")
             return
-        cfg = TrainingConfig(
-            backend=self.train_backend.get(),
-            segment_seconds=float(self.train_segment.get()),
-            epochs=int(self.train_epochs.get()),
-            batch_size=int(self.train_batch.get()),
-        )
+        cfg = TrainingConfig()
         self.worker.run(
             "training",
             train_model,
@@ -157,18 +160,26 @@ class AudioCoverGui:
             consent=True,
         )
 
+    def _dedicated_output_dir(self, requested: Path) -> Path:
+        if not requested.exists() or not any(requested.iterdir()):
+            return requested
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        return requested.parent / f"{requested.name}-{stamp}"
+
     def _start_render(self) -> None:
         if not self.render_consent.get():
             messagebox.showerror("Consent required", "Confirm that you have permission to use the song and model.")
             return
-        cfg = RenderConfig.from_yaml(Path(self.config_path.get()))
-        cfg.overwrite = self.render_overwrite.get()
+        cfg = RenderConfig.from_yaml(default_config_path())
+        out_dir = self._dedicated_output_dir(Path(self.render_out.get()))
+        if out_dir != Path(self.render_out.get()):
+            self.log_queue.put(f"[render] output folder exists; using {out_dir}")
         self.worker.run(
             "render",
             render_cover,
             Path(self.song_path.get()),
             Path(self.model_yaml.get()),
-            Path(self.render_out.get()),
+            out_dir,
             config=cfg,
             consent=True,
         )

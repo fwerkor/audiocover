@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from .config import ConversionConfig, ModelPackage, TrainingConfig
+from .config import ConversionConfig, ModelPackage, TrainingConfig, resolve_training_config
 from .dataset import prepare_dataset
 from .external import run_template
 from .simple_timbre import train_simple_timbre
@@ -19,6 +19,7 @@ def train_model(
 ) -> ModelPackage:
     if not consent:
         raise PermissionError("training requires explicit consent confirmation")
+    config = resolve_training_config(config)
     output_dir.mkdir(parents=True, exist_ok=True)
     dataset_dir = output_dir / "dataset"
     report = prepare_dataset(

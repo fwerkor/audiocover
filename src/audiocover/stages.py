@@ -18,7 +18,13 @@ from .audio import (
     soft_knee_compressor,
     write_audio,
 )
-from .config import ConversionConfig, MixConfig, SeparatorConfig
+from .config import (
+    ConversionConfig,
+    MixConfig,
+    SeparatorConfig,
+    resolve_conversion_config,
+    resolve_separator_config,
+)
 from .external import run_template
 from .simple_timbre import apply_simple_timbre
 
@@ -35,6 +41,7 @@ class Converted:
 
 
 def separate(input_wav: Path, out_dir: Path, cfg: SeparatorConfig) -> Stems:
+    cfg = resolve_separator_config(cfg)
     out_dir.mkdir(parents=True, exist_ok=True)
     vocals = out_dir / "vocals.wav"
     instrumental = out_dir / "instrumental.wav"
@@ -89,6 +96,7 @@ def separate(input_wav: Path, out_dir: Path, cfg: SeparatorConfig) -> Stems:
 
 
 def convert_vocal(vocals: Path, out_dir: Path, cfg: ConversionConfig, workdir: Path) -> Converted:
+    cfg = resolve_conversion_config(cfg)
     out_dir.mkdir(parents=True, exist_ok=True)
     output = out_dir / "converted_vocal.wav"
     if cfg.backend == "passthrough":

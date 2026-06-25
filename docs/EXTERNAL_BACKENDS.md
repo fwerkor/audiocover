@@ -1,38 +1,7 @@
-# External backends
+# Advanced engine hooks
 
-AudioCover does not vendor third-party SVC/RVC engines. It invokes them through command templates.
+Normal GUI users do not choose an engine.
 
-## External training
+Advanced automation can add command templates to YAML files. With `backend: auto`, AudioCover uses package-specific commands when present and otherwise uses the local CPU path.
 
-Example:
-
-```yaml
-backend: external
-sample_rate: 48000
-segment_seconds: 12
-epochs: 300
-batch_size: 8
-commands:
-  - python C:/rvc/preprocess.py --input {dataset} --output {workdir}
-  - python C:/rvc/train.py --workdir {workdir} --epochs {epochs} --batch-size {batch_size}
-  - python C:/rvc/index.py --workdir {workdir} --output {index}
-```
-
-## External inference
-
-In `model.yaml`:
-
-```yaml
-conversion:
-  backend: external
-  command_template: >
-    python C:/rvc/infer.py
-    --input {input}
-    --output {output}
-    --model {model}
-    --index {index}
-    --transpose {transpose}
-    --f0_method {f0_method}
-```
-
-This keeps AudioCover stable even when third-party CLIs change.
+Placeholders include `{raw}`, `{dataset}`, `{workdir}`, `{model}`, `{index}`, `{input}`, `{output}`, `{epochs}`, `{batch_size}`, `{sample_rate}`, and `{transpose}`.

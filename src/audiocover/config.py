@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 from pathlib import Path
 from typing import Any, Literal
 
@@ -8,9 +9,9 @@ from pydantic import BaseModel, Field
 
 
 class SeparatorConfig(BaseModel):
-    backend: Literal["demucs", "external", "none"] = "demucs"
+    backend: Literal["auto", "demucs", "external", "none"] = "auto"
     model: str = "htdemucs_ft"
-    device: str = "cuda"
+    device: str = "auto"
     shifts: int = Field(default=8, ge=0, le=32)
     overlap: float = Field(default=0.5, ge=0.0, le=0.99)
     two_stems: str = "vocals"
@@ -20,7 +21,7 @@ class SeparatorConfig(BaseModel):
 
 
 class ConversionConfig(BaseModel):
-    backend: Literal["external", "passthrough", "simple-timbre"] = "external"
+    backend: Literal["auto", "external", "passthrough", "simple-timbre"] = "auto"
     command_template: str | None = None
     model_path: Path | None = None
     index_path: Path | None = None
@@ -34,7 +35,7 @@ class ConversionConfig(BaseModel):
 
 
 class TrainingConfig(BaseModel):
-    backend: Literal["simple-timbre", "external"] = "simple-timbre"
+    backend: Literal["auto", "simple-timbre", "external"] = "auto"
     sample_rate: int = 48000
     segment_seconds: float = Field(default=12.0, ge=2.0, le=30.0)
     epochs: int = Field(default=200, ge=1)
@@ -147,3 +148,68 @@ def default_config_path() -> Path:
 
 def default_training_config_path() -> Path:
     return Path(__file__).resolve().parents[2] / "configs" / "training_simple.yaml"
+
+
+
+def _module_available(name: str) -> bool:
+    return importlib.util.find_spec(name) is not None
+
+
+def best_available_torch_device() -> str:
+    try:
+        import torch  # type: ignore[import-not-found]
+    except Exception:
+        return "cpu"
+    try:
+        if torch.cuda.is_available():
+            return "cuda"
+        mps = getattr(torch.backends, "mps", None)
+        if mps is not None and mps.is_available():
+            return "mps"
+    except Exception:
+        return "cpu"
+    return "cpu"
+
+
+def resolve_separator_config(cfg: SeparatorConfig) -> SeparatorConfig:
+    if cfg.backend != "auto":
+        if cfg.backend == "demucs" and cfg.device == "auto":
+            data = cfg.model_dump()
+            data["device"] = best_available_torch_device()
+            return SeparatorConfig.model_validate(data)
+        return cfg
+
+    data = cfg.model_dump()
+    if _module_available("demucs"):
+        data["backend"] = "demucs"
+        data["device"] = best_available_torch_device()
+    elif cfg.command_template:
+        data["backend"] = "external"
+    else:
+        data["backend"] = "none"
+        data["device"] = "cpu"
+    return SeparatorConfig.model_validate(data)
+
+
+def resolve_conversion_config(cfg: ConversionConfig) -> ConversionConfig:
+    if cfg.backend != "auto":
+        return cfg
+
+    data = cfg.model_dump()
+    if cfg.command_template:
+        data["backend"] = "external"
+    elif cfg.simple_profile_path:
+        data["backend"] = "simple-timbre"
+    elif cfg.model_path or cfg.index_path:
+        data["backend"] = "external"
+    else:
+        data["backend"] = "passthrough"
+    return ConversionConfig.model_validate(data)
+
+
+def resolve_training_config(cfg: TrainingConfig) -> TrainingConfig:
+    if cfg.backend != "auto":
+        return cfg
+    data = cfg.model_dump()
+    data["backend"] = "external" if cfg.commands else "simple-timbre"
+    return TrainingConfig.model_validate(data)

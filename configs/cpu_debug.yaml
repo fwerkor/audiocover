@@ -1,0 +1,10 @@
+separator:
+  backend: none
+conversion:
+  backend: passthrough
+mix:
+  sample_rate: 48000
+  target_lufs: -16.0
+qc: {}
+keep_intermediates: true
+overwrite: true

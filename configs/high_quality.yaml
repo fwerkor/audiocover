@@ -1,0 +1,33 @@
+separator:
+  backend: demucs
+  model: htdemucs_ft
+  device: cuda
+  shifts: 8
+  overlap: 0.5
+  two_stems: vocals
+conversion:
+  backend: external
+  command_template: null
+  f0_method: rmvpe
+  transpose: 0
+  protect: 0.33
+  index_rate: 0.75
+  rms_mix_rate: 0.25
+mix:
+  sample_rate: 48000
+  instrumental_gain_db: -1.5
+  vocal_gain_db: 0.0
+  vocal_highpass_hz: 70.0
+  vocal_lowpass_hz: 18000.0
+  compressor_threshold_db: -18.0
+  compressor_ratio: 2.8
+  compressor_attack_ms: 8.0
+  compressor_release_ms: 90.0
+  deess_amount: 0.18
+  reverb_wet: 0.055
+  reverb_decay: 0.28
+  target_lufs: -14.0
+  final_peak_db: -1.0
+qc: {}
+keep_intermediates: true
+overwrite: false

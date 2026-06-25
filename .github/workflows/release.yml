@@ -4,9 +4,22 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release tag to create, for example v0.2.0'
+        required: true
+        type: string
+      prerelease:
+        description: 'Mark this release as a prerelease'
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: write
+
+run-name: release ${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_name }}
 
 jobs:
   build-python:
@@ -47,6 +60,10 @@ jobs:
           path: artifacts
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_name }}
+          target_commitish: ${{ github.event_name == 'workflow_dispatch' && github.sha || '' }}
+          prerelease: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease || false }}
+          generate_release_notes: true
           files: |
             artifacts/python-dist/*
             artifacts/AudioCoverLab-windows/AudioCoverLab-windows.zip

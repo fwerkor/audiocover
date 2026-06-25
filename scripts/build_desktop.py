@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build backend worker runtimes, desktop bundle, and release archives."""
+"""Build backend worker runtimes, desktop bundles, runtime packs, and archives."""
 
 from __future__ import annotations
 
@@ -25,15 +25,26 @@ WORKERS = {
     "so-vits-svc": "audiocover.workers.so_vits_svc_worker",
     "demucs-separator": "audiocover.workers.demucs_separator_worker",
 }
+WORKER_SETS = {
+    "desktop": ("simple-timbre",),
+    "simple": ("simple-timbre",),
+    "rvc": ("rvc",),
+    "so-vits-svc": ("so-vits-svc",),
+    "demucs": ("demucs-separator",),
+    "all": tuple(WORKERS),
+}
+WORKER_COLLECTS = {
+    "rvc": ("rvc_python",),
+    "so-vits-svc": ("so_vits_svc_fork",),
+    "demucs-separator": ("demucs",),
+}
 WORKER_EXCLUDES = (
     "IPython",
-    "matplotlib",
     "notebook",
     "pandas",
     "pyarrow",
     "pytest",
     "sklearn",
-    "tkinter",
 )
 
 
@@ -57,6 +68,10 @@ def _normalize_machine(value: str) -> str:
         "aarch64": "arm64",
     }
     return aliases.get(value, value.replace(" ", "-"))
+
+
+def _platform_name() -> str:
+    return f"{_normalize_system(platform.system())}-{_normalize_machine(platform.machine())}"
 
 
 def _run(command: list[str], *, env: dict[str, str] | None = None) -> None:
@@ -88,9 +103,9 @@ def _fail(message: str) -> NoReturn:
     raise SystemExit(message)
 
 
-def _worker_executable(worker_name: str) -> Path:
+def _worker_executable(worker_name: str, runtime_dir: Path = RUNTIME_DIR) -> Path:
     suffix = ".exe" if platform.system().lower().startswith("win") else ""
-    return RUNTIME_DIR / worker_name / f"{worker_name}{suffix}"
+    return runtime_dir / worker_name / f"{worker_name}{suffix}"
 
 
 def _bundle_executable() -> Path:
@@ -102,15 +117,23 @@ def _bundle_executable() -> Path:
     return APP_DIR / "AudioCover"
 
 
-def build_workers(clean: bool) -> None:
+def _worker_names(worker_set: str) -> tuple[str, ...]:
+    try:
+        return WORKER_SETS[worker_set]
+    except KeyError as exc:
+        raise SystemExit(f"unknown worker set: {worker_set}") from exc
+
+
+def build_workers(worker_names: tuple[str, ...], *, clean: bool, runtime_dir: Path = RUNTIME_DIR) -> None:
     if clean:
-        shutil.rmtree(RUNTIME_DIR, ignore_errors=True)
+        shutil.rmtree(runtime_dir, ignore_errors=True)
         shutil.rmtree(BUILD_DIR / "backend-runtimes", ignore_errors=True)
-    RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+    runtime_dir.mkdir(parents=True, exist_ok=True)
     spec_dir = BUILD_DIR / "backend-runtimes" / "specs"
     spec_dir.mkdir(parents=True, exist_ok=True)
-    for worker_name, module in WORKERS.items():
-        worker_dist = RUNTIME_DIR / worker_name
+    for worker_name in worker_names:
+        module = WORKERS[worker_name]
+        worker_dist = runtime_dir / worker_name
         worker_build = BUILD_DIR / "backend-runtimes" / worker_name
         shutil.rmtree(worker_dist, ignore_errors=True)
         shutil.rmtree(worker_build, ignore_errors=True)
@@ -130,18 +153,25 @@ def build_workers(clean: bool) -> None:
             "--paths",
             str(ROOT / "src"),
         ]
+        for collected in WORKER_COLLECTS.get(worker_name, ()):  # backend packages can have dynamic imports
+            command.extend(["--collect-all", collected])
         for excluded in WORKER_EXCLUDES:
             command.extend(["--exclude-module", excluded])
         command.append(str(ROOT / "src" / "audiocover" / "workers" / f"{module.rsplit('.', 1)[-1]}.py"))
         _run(command)
-        executable = _worker_executable(worker_name)
+        executable = _worker_executable(worker_name, runtime_dir)
         if not executable.exists():
             raise FileNotFoundError(f"worker executable was not created: {executable}")
 
 
-def smoke_test_workers() -> None:
-    for worker_name in WORKERS:
-        executable = _worker_executable(worker_name)
+def smoke_test_workers(
+    worker_names: tuple[str, ...],
+    *,
+    runtime_dir: Path = RUNTIME_DIR,
+    require_available: bool = False,
+) -> None:
+    for worker_name in worker_names:
+        executable = _worker_executable(worker_name, runtime_dir)
         if not executable.exists():
             raise FileNotFoundError(f"worker executable was not found: {executable}")
         result = _capture_json(
@@ -152,21 +182,23 @@ def smoke_test_workers() -> None:
             f"runtime {worker_name}: available={result.get('available')} actions={result.get('actions')} reason={result.get('reason') or ''}",
             flush=True,
         )
-    simple = _capture_json(
-        [str(_worker_executable("simple-timbre"))],
-        input_json={"id": "smoke", "action": "capabilities", "payload": {}},
-    )
-    if not simple.get("available") or "train" not in simple.get("actions", []):
-        raise RuntimeError("simple-timbre worker must be available for offline packaged operation")
+        if require_available and not result.get("available"):
+            raise RuntimeError(f"runtime pack worker is inactive: {worker_name}: {result.get('reason')}")
+
+    if "simple-timbre" in worker_names:
+        simple = _capture_json(
+            [str(_worker_executable("simple-timbre", runtime_dir))],
+            input_json={"id": "smoke", "action": "capabilities", "payload": {}},
+        )
+        if not simple.get("available") or "train" not in simple.get("actions", []):
+            raise RuntimeError("simple-timbre worker must be available for offline packaged operation")
 
 
 def smoke_test_bundle() -> None:
     executable = _bundle_executable()
     if not executable.exists():
         raise FileNotFoundError(f"Desktop executable was not found: {executable}")
-    env = os.environ.copy()
-    env["AUDIOCOVER_BACKEND_RUNTIMES"] = str(RUNTIME_DIR)
-    _run([str(executable), "--smoke-test"], env=env)
+    _run([str(executable), "--smoke-test"])
 
 
 def build_bundle(clean: bool) -> None:
@@ -179,16 +211,29 @@ def build_bundle(clean: bool) -> None:
 
 
 def package_bundle() -> Path:
-    system = _normalize_system(platform.system())
-    machine = _normalize_machine(platform.machine())
-    artifact_base = DIST_DIR / f"audiocover-{system}-{machine}"
-
+    artifact_base = DIST_DIR / f"audiocover-{_platform_name()}"
     package_dir = MAC_APP_DIR if MAC_APP_DIR.exists() else APP_DIR
-    archive_format = "zip" if system == "windows" else "gztar"
+    archive_format = "zip" if _normalize_system(platform.system()) == "windows" else "gztar"
     artifact = Path(
         shutil.make_archive(str(artifact_base), archive_format, root_dir=DIST_DIR, base_dir=package_dir.name)
     )
+    print(f"Built {artifact.relative_to(ROOT)}", flush=True)
+    github_output = os.environ.get("GITHUB_OUTPUT")
+    if github_output:
+        with open(github_output, "a", encoding="utf-8") as handle:
+            handle.write(f"artifact={artifact.as_posix()}\n")
+    return artifact
 
+
+def package_runtime_pack(pack_name: str, runtime_dir: Path = RUNTIME_DIR) -> Path:
+    if not runtime_dir.exists():
+        raise FileNotFoundError(f"runtime directory does not exist: {runtime_dir}")
+    DIST_DIR.mkdir(parents=True, exist_ok=True)
+    artifact_base = DIST_DIR / f"audiocover-backend-runtimes-{pack_name}-{_platform_name()}"
+    archive_format = "zip" if _normalize_system(platform.system()) == "windows" else "gztar"
+    artifact = Path(
+        shutil.make_archive(str(artifact_base), archive_format, root_dir=ROOT, base_dir=runtime_dir.name)
+    )
     print(f"Built {artifact.relative_to(ROOT)}", flush=True)
     github_output = os.environ.get("GITHUB_OUTPUT")
     if github_output:
@@ -200,9 +245,11 @@ def package_bundle() -> Path:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--no-clean", action="store_true", help="reuse existing build directories")
+    parser.add_argument("--worker-set", default="desktop", choices=sorted(WORKER_SETS), help="worker group to build")
     parser.add_argument("--workers-only", action="store_true", help="build and smoke-test backend runtimes only")
     parser.add_argument("--skip-workers", action="store_true", help="reuse existing backend runtimes")
     parser.add_argument("--runtime-smoke-test-only", action="store_true", help="smoke-test existing backend runtimes")
+    parser.add_argument("--runtime-pack", choices=sorted(WORKER_SETS), help="build and archive a backend runtime pack")
     parser.add_argument(
         "--smoke-test-only",
         action="store_true",
@@ -210,20 +257,29 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    worker_set = args.runtime_pack or args.worker_set
+    worker_names = _worker_names(worker_set)
+
     if args.runtime_smoke_test_only:
-        smoke_test_workers()
+        smoke_test_workers(worker_names)
         return
 
     if args.smoke_test_only:
         if not (APP_DIR.exists() or MAC_APP_DIR.exists()):
             _fail("No existing desktop bundle found; build it before running --smoke-test-only")
-        smoke_test_workers()
+        smoke_test_workers(_worker_names("desktop"))
         smoke_test_bundle()
         return
 
+    if args.runtime_pack:
+        build_workers(worker_names, clean=not args.no_clean)
+        smoke_test_workers(worker_names, require_available=args.runtime_pack not in {"desktop", "simple"})
+        package_runtime_pack(args.runtime_pack)
+        return
+
     if not args.skip_workers:
-        build_workers(clean=not args.no_clean)
-    smoke_test_workers()
+        build_workers(worker_names, clean=not args.no_clean)
+    smoke_test_workers(worker_names)
     if args.workers_only:
         return
 

@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Release tag to create, for example v0.2.0'
+        description: 'Release tag to create, for example v0.5.0'
         required: true
         type: string
       prerelease:
@@ -68,8 +68,7 @@ jobs:
       - name: Install desktop build dependencies
         run: python -m pip install -U pip && python -m pip install -e ".[build]"
       - name: Build desktop bundle
-        id: bundle
-        run: python scripts/build_desktop.py
+        run: python scripts/build_desktop.py --worker-set desktop
       - name: Smoke test desktop bundle
         run: python scripts/build_desktop.py --smoke-test-only
       - uses: actions/upload-artifact@v4
@@ -78,8 +77,84 @@ jobs:
           path: dist/audiocover-*
           if-no-files-found: error
 
+  build-runtime-pack:
+    name: runtime ${{ matrix.backend }} ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - backend: demucs
+            extra: demucs-backend
+            python: '3.12'
+            name: windows-x64
+            os: windows-latest
+          - backend: demucs
+            extra: demucs-backend
+            python: '3.12'
+            name: linux-x64
+            os: ubuntu-latest
+          - backend: demucs
+            extra: demucs-backend
+            python: '3.12'
+            name: linux-arm64
+            os: ubuntu-24.04-arm
+          - backend: demucs
+            extra: demucs-backend
+            python: '3.12'
+            name: macos-arm64
+            os: macos-latest
+          - backend: so-vits-svc
+            extra: so-vits-svc-backend
+            python: '3.12'
+            name: windows-x64
+            os: windows-latest
+          - backend: so-vits-svc
+            extra: so-vits-svc-backend
+            python: '3.12'
+            name: linux-x64
+            os: ubuntu-latest
+          - backend: so-vits-svc
+            extra: so-vits-svc-backend
+            python: '3.12'
+            name: linux-arm64
+            os: ubuntu-24.04-arm
+          - backend: so-vits-svc
+            extra: so-vits-svc-backend
+            python: '3.12'
+            name: macos-arm64
+            os: macos-latest
+          - backend: rvc
+            extra: rvc-backend
+            python: '3.10'
+            name: linux-x64
+            os: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install platform packages on Ubuntu
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg libsndfile1 python3-tk
+      - name: Install FFmpeg on Windows
+        if: runner.os == 'Windows'
+        run: choco install ffmpeg -y
+      - name: Install FFmpeg on macOS
+        if: runner.os == 'macOS'
+        run: brew install ffmpeg
+      - name: Install runtime build dependencies
+        run: python -m pip install -U pip && python -m pip install -e ".[build,${{ matrix.extra }}]"
+      - name: Build runtime pack
+        run: python scripts/build_desktop.py --runtime-pack ${{ matrix.backend }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: runtime-${{ matrix.backend }}-${{ matrix.name }}
+          path: dist/audiocover-backend-runtimes-*
+          if-no-files-found: error
+
   publish:
-    needs: [build-python, build-desktop]
+    needs: [build-python, build-desktop, build-runtime-pack]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -94,3 +169,4 @@ jobs:
           files: |
             artifacts/python-dist/*
             artifacts/desktop-*/*
+            artifacts/runtime-*/*

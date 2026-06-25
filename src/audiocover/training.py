@@ -33,6 +33,9 @@ def _package_from_runtime(
     simple_profile = _relative_to_output(result.get("simple_profile_path"), output_dir)
     model_path = _relative_to_output(result.get("model_path"), output_dir)
     index_path = _relative_to_output(result.get("index_path"), output_dir)
+    config_path = _relative_to_output(result.get("config_path"), output_dir)
+    cluster_model_path = _relative_to_output(result.get("cluster_model_path"), output_dir)
+    speaker = result.get("speaker")
     conversion_backend = str(result.get("conversion_backend") or "managed")
     if conversion_backend == "simple-timbre":
         conversion_backend = "managed"
@@ -41,7 +44,10 @@ def _package_from_runtime(
         runtime_backend=runtime_backend,
         model_path=model_path,
         index_path=index_path,
+        config_path=config_path,
+        cluster_model_path=cluster_model_path,
         simple_profile_path=simple_profile,
+        speaker=str(speaker) if speaker else None,
         f0_method=config.f0_method,
     )
     return ModelPackage(
@@ -51,7 +57,10 @@ def _package_from_runtime(
         runtime_backend=runtime_backend,
         model_path=model_path,
         index_path=index_path,
+        config_path=config_path,
+        cluster_model_path=cluster_model_path,
         simple_profile_path=simple_profile,
+        speaker=str(speaker) if speaker else None,
         f0_method=config.f0_method,
         notes=result.get("notes"),
     )

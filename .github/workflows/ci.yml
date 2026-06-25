@@ -28,13 +28,13 @@ jobs:
       - name: Install package
         run: python -m pip install -U pip && python -m pip install -e ".[dev]"
       - name: Lint
-        run: ruff check src tests
+        run: ruff check src tests scripts
       - name: Compile
-        run: python -m compileall src tests
+        run: python -m compileall src tests scripts
       - name: Tests
         run: pytest
 
-  backend-runtimes:
+  desktop-runtime:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -45,5 +45,19 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ffmpeg libsndfile1 python3-tk
       - name: Install build dependencies
         run: python -m pip install -U pip && python -m pip install -e ".[build]"
-      - name: Build worker runtimes
-        run: python scripts/build_desktop.py --workers-only
+      - name: Build desktop worker runtime
+        run: python scripts/build_desktop.py --workers-only --worker-set desktop
+
+  separator-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install platform packages
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg libsndfile1 python3-tk
+      - name: Install runtime dependencies
+        run: python -m pip install -U pip && python -m pip install -e ".[build,demucs-backend]"
+      - name: Build separator runtime pack
+        run: python scripts/build_desktop.py --runtime-pack demucs

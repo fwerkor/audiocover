@@ -26,7 +26,10 @@ class ConversionConfig(BaseModel):
     command_template: str | None = None
     model_path: Path | None = None
     index_path: Path | None = None
+    config_path: Path | None = None
+    cluster_model_path: Path | None = None
     simple_profile_path: Path | None = None
+    speaker: str | None = None
     f0_method: str = "rmvpe"
     transpose: int = Field(default=0, ge=-24, le=24)
     protect: float = Field(default=0.33, ge=0.0, le=1.0)
@@ -94,7 +97,10 @@ class ModelPackage(BaseModel):
     runtime_backend: str | None = None
     model_path: Path | None = None
     index_path: Path | None = None
+    config_path: Path | None = None
+    cluster_model_path: Path | None = None
     simple_profile_path: Path | None = None
+    speaker: str | None = None
     transpose: int = 0
     f0_method: str = "rmvpe"
     created_by: str = "audiocover"
@@ -109,12 +115,12 @@ class ModelPackage(BaseModel):
 
     def resolve_relative_paths(self, base_dir: Path) -> ModelPackage:
         data = self.model_dump()
-        for key in ("model_path", "index_path", "simple_profile_path"):
+        for key in ("model_path", "index_path", "config_path", "cluster_model_path", "simple_profile_path"):
             value = getattr(self, key)
             if value is not None and not value.is_absolute():
                 data[key] = base_dir / value
         conv = data.get("conversion") or {}
-        for key in ("model_path", "index_path", "simple_profile_path"):
+        for key in ("model_path", "index_path", "config_path", "cluster_model_path", "simple_profile_path"):
             value = conv.get(key)
             if value is not None:
                 p = Path(value)
@@ -130,10 +136,16 @@ class ModelPackage(BaseModel):
             data["model_path"] = self.model_path
         if self.index_path is not None:
             data["index_path"] = self.index_path
+        if self.config_path is not None:
+            data["config_path"] = self.config_path
+        if self.cluster_model_path is not None:
+            data["cluster_model_path"] = self.cluster_model_path
         if self.simple_profile_path is not None:
             data["simple_profile_path"] = self.simple_profile_path
         if self.runtime_backend is not None:
             data["runtime_backend"] = self.runtime_backend
+        if self.speaker is not None:
+            data["speaker"] = self.speaker
         data["transpose"] = self.transpose
         data["f0_method"] = self.f0_method
         return ConversionConfig.model_validate(data)

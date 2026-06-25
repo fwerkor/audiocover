@@ -7,6 +7,7 @@ AudioCover is a desktop GUI and CLI for local audio-cover workflows. It prepares
 - Desktop GUI for training data, model package, song input, output folder, and rights confirmation.
 - Automatic backend runtime selection without a user-facing backend picker.
 - Isolated backend workers that communicate with the main app through JSON stdin/stdout.
+- Split backend runtime packs for large or conflicting engines.
 - CLI commands for dataset preparation, training, rendering, quality checks, and diagnostics.
 - Reproducible output folders with manifests, quality-control reports, and intermediate audio files.
 
@@ -19,7 +20,7 @@ audiocover-gui
 The GUI expects:
 
 - **Training data:** a folder of authorized `.wav`, `.flac`, `.mp3`, `.m4a`, `.aac`, or `.ogg` recordings of one target voice.
-- **Model package:** an AudioCover `model.yaml` produced by training.
+- **Model package:** an AudioCover `model.yaml` produced by training or prepared for an existing backend model.
 - **Song input:** an authorized audio file to render.
 - **Output folder:** a directory for generated audio, intermediates, and reports.
 
@@ -35,9 +36,9 @@ audiocover doctor
 
 ## Backend runtimes
 
-AudioCover uses a runtime manager in the main process and isolated worker executables under `backend-runtimes/` in desktop builds. Workers are invoked with JSON requests over stdin/stdout, which keeps backend dependency sets separated from the GUI process.
+AudioCover uses a runtime manager in the main process and isolated worker executables under `backend-runtimes/`. Workers are invoked with JSON requests over stdin/stdout, which keeps backend dependency sets separated from the GUI process.
 
-Desktop release artifacts include the runtime directory produced by the build workflow. Source-tree development can also run workers as Python modules for tests and local debugging.
+Desktop artifacts include the lightweight built-in worker. Release artifacts also provide platform-specific runtime packs such as `audiocover-backend-runtimes-demucs-...`, `audiocover-backend-runtimes-so-vits-svc-...`, and supported RVC packs. Extract a runtime pack next to the desktop app, or run the app from a directory that contains the extracted `backend-runtimes/` folder. The runtime manager discovers it automatically; Python, pip, and backend command-line tools do not need to be installed by the user.
 
 ## Responsible use
 

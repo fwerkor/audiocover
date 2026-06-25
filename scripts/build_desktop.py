@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import platform
@@ -225,6 +226,39 @@ def package_bundle() -> Path:
     return artifact
 
 
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _split_large_artifact(artifact: Path, *, max_part_bytes: int = 1900 * 1024 * 1024) -> list[Path]:
+    if artifact.stat().st_size <= max_part_bytes:
+        checksum = artifact.with_name(artifact.name + ".sha256")
+        checksum.write_text(f"{_sha256_file(artifact)}  {artifact.name}\n", encoding="utf-8")
+        return [artifact, checksum]
+
+    parts: list[Path] = []
+    index = 1
+    with artifact.open("rb") as src:
+        while True:
+            chunk = src.read(max_part_bytes)
+            if not chunk:
+                break
+            part = artifact.with_name(f"{artifact.name}.part{index:03d}")
+            part.write_bytes(chunk)
+            parts.append(part)
+            index += 1
+    checksum = artifact.with_name(artifact.name + ".sha256")
+    checksum.write_text(f"{_sha256_file(artifact)}  {artifact.name}\n", encoding="utf-8")
+    parts.append(checksum)
+    artifact.unlink()
+    print(f"Split large artifact into {len(parts) - 1} parts: {artifact.name}", flush=True)
+    return parts
+
+
 def package_runtime_pack(pack_name: str, runtime_dir: Path = RUNTIME_DIR) -> Path:
     if not runtime_dir.exists():
         raise FileNotFoundError(f"runtime directory does not exist: {runtime_dir}")
@@ -234,12 +268,14 @@ def package_runtime_pack(pack_name: str, runtime_dir: Path = RUNTIME_DIR) -> Pat
     artifact = Path(
         shutil.make_archive(str(artifact_base), archive_format, root_dir=ROOT, base_dir=runtime_dir.name)
     )
-    print(f"Built {artifact.relative_to(ROOT)}", flush=True)
+    outputs = _split_large_artifact(artifact)
+    for item in outputs:
+        print(f"Built {item.relative_to(ROOT)}", flush=True)
     github_output = os.environ.get("GITHUB_OUTPUT")
     if github_output:
         with open(github_output, "a", encoding="utf-8") as handle:
-            handle.write(f"artifact={artifact.as_posix()}\n")
-    return artifact
+            handle.write(f"artifact={outputs[0].as_posix()}\n")
+    return outputs[0]
 
 
 def main() -> None:

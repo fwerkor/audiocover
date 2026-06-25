@@ -20,7 +20,9 @@ def train(payload: dict[str, Any]) -> dict[str, Any]:
     output_dir = Path(payload["output_dir"])
     sample_rate = int(payload.get("sample_rate") or 48000)
     output_dir.mkdir(parents=True, exist_ok=True)
+    print(f"simple-timbre: reading prepared wavs from {dataset_wavs}", flush=True)
     profile = train_simple_timbre(dataset_wavs, output_dir / "simple_timbre.json", sample_rate)
+    print(f"simple-timbre: wrote profile {profile}", flush=True)
     return {
         "backend": "simple-timbre",
         "conversion_backend": "managed",

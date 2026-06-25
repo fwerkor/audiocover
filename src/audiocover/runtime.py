@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import json
 import os
+import queue
 import subprocess
 import sys
+import threading
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
@@ -44,6 +47,16 @@ WORKER_MODULES = {
 TRAINING_ORDER = ("rvc", "so-vits-svc", "simple-timbre")
 CONVERSION_ORDER = ("rvc", "so-vits-svc", "simple-timbre")
 SEPARATOR_ORDER = ("demucs-separator",)
+
+
+def _is_response_line(line: str, request_id: str) -> bool:
+    if not line.startswith("{"):
+        return False
+    try:
+        data = json.loads(line)
+    except json.JSONDecodeError:
+        return False
+    return data.get("id") == request_id and "ok" in data
 
 
 def _runtime_roots() -> list[Path]:
@@ -98,7 +111,7 @@ def _source_command(worker_name: str) -> tuple[str, ...] | None:
 
 class BackendRuntimeManager:
     def __init__(self, runtime_roots: list[Path] | None = None) -> None:
-        self.runtime_roots = runtime_roots or _runtime_roots()
+        self.runtime_roots = _runtime_roots() if runtime_roots is None else runtime_roots
 
     @cached_property
     def runtimes(self) -> dict[str, RuntimeSpec]:
@@ -124,24 +137,85 @@ class BackendRuntimeManager:
                     found[worker_name] = RuntimeSpec(worker_name, command, "source")
         return found
 
-    def invoke(self, worker_name: str, action: str, payload: dict[str, Any]) -> dict[str, Any]:
+    def invoke(
+        self,
+        worker_name: str,
+        action: str,
+        payload: dict[str, Any],
+        *,
+        log: Callable[[str], None] | None = None,
+    ) -> dict[str, Any]:
         runtime = self.runtimes.get(worker_name)
         if runtime is None:
             raise BackendRuntimeError(f"backend runtime is not bundled: {worker_name}")
         request = {"id": uuid.uuid4().hex, "action": action, "payload": payload}
-        process = subprocess.run(
+        request_text = json.dumps(request, ensure_ascii=False)
+        if log:
+            log(f"starting {worker_name} runtime action: {action}")
+
+        env = os.environ.copy()
+        env.setdefault("PYTHONUNBUFFERED", "1")
+        process = subprocess.Popen(
             list(runtime.command),
-            input=json.dumps(request, ensure_ascii=False),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            capture_output=True,
-            check=False,
+            bufsize=1,
+            env=env,
         )
-        if process.returncode != 0:
+        stdout_lines: list[str] = []
+        stderr_lines: list[str] = []
+        events: queue.Queue[tuple[str, str]] = queue.Queue()
+
+        def read_stream(stream_name: str, lines: list[str], stream) -> None:
+            assert stream is not None
+            for raw_line in stream:
+                line = raw_line.rstrip("\r\n")
+                lines.append(line)
+                events.put((stream_name, line))
+
+        threads = [
+            threading.Thread(target=read_stream, args=("stdout", stdout_lines, process.stdout), daemon=True),
+            threading.Thread(target=read_stream, args=("stderr", stderr_lines, process.stderr), daemon=True),
+        ]
+        for thread in threads:
+            thread.start()
+
+        assert process.stdin is not None
+        try:
+            process.stdin.write(request_text)
+            process.stdin.close()
+        except BrokenPipeError:
+            pass
+
+        while process.poll() is None or any(thread.is_alive() for thread in threads) or not events.empty():
+            try:
+                stream_name, line = events.get(timeout=0.1)
+            except queue.Empty:
+                continue
+            if log and line and not _is_response_line(line, request["id"]):
+                prefix = "stderr" if stream_name == "stderr" else "stdout"
+                log(f"{worker_name} {prefix}: {line}")
+
+        for thread in threads:
+            thread.join(timeout=0.2)
+
+        while not events.empty():
+            stream_name, line = events.get_nowait()
+            if log and line and not _is_response_line(line, request["id"]):
+                prefix = "stderr" if stream_name == "stderr" else "stdout"
+                log(f"{worker_name} {prefix}: {line}")
+
+        return_code = process.returncode
+        if return_code != 0:
+            stderr_tail = "\n".join(stderr_lines)[-4000:]
+            stdout_tail = "\n".join(stdout_lines)[-4000:]
             raise BackendRuntimeError(
-                f"{worker_name} runtime failed with exit code {process.returncode}: "
-                f"{process.stderr[-4000:] or process.stdout[-4000:]}"
+                f"{worker_name} runtime failed with exit code {return_code}: "
+                f"{stderr_tail or stdout_tail}"
             )
-        stdout = process.stdout.strip().splitlines()
+        stdout = [line for line in stdout_lines if line]
         if not stdout:
             raise BackendRuntimeError(f"{worker_name} runtime returned no JSON response")
         try:
@@ -158,6 +232,8 @@ class BackendRuntimeManager:
         result = response.get("result")
         if not isinstance(result, dict):
             raise BackendRuntimeError(f"{worker_name} runtime returned a non-object result")
+        if log:
+            log(f"finished {worker_name} runtime action: {action}")
         return result
 
     def capabilities(self, worker_name: str) -> RuntimeCapabilities:

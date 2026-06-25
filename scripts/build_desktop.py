@@ -36,7 +36,7 @@ WORKER_SETS = {
 }
 WORKER_COLLECTS = {
     "rvc": ("rvc_python",),
-    "so-vits-svc": ("so_vits_svc_fork",),
+    "so-vits-svc": ("so_vits_svc_fork", "librosa", "sklearn"),
     "demucs-separator": ("demucs",),
 }
 WORKER_EXCLUDES = (
@@ -45,7 +45,6 @@ WORKER_EXCLUDES = (
     "pandas",
     "pyarrow",
     "pytest",
-    "sklearn",
 )
 
 

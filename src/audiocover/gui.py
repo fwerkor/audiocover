@@ -157,6 +157,7 @@ class AudioCoverGui:
             display_name=self.train_name.get(),
             config=cfg,
             consent=True,
+            log=lambda message: self.log_queue.put(f"[training] {message}"),
         )
 
     def _dedicated_output_dir(self, requested: Path) -> Path:

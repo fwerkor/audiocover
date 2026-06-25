@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 from .config import ConversionConfig, ModelPackage, TrainingConfig, resolve_training_config
@@ -73,28 +74,37 @@ def train_model(
     display_name: str,
     config: TrainingConfig,
     consent: bool,
+    log: Callable[[str], None] | None = None,
 ) -> ModelPackage:
     if not consent:
         raise PermissionError("training requires explicit consent confirmation")
     config = resolve_training_config(config)
     output_dir.mkdir(parents=True, exist_ok=True)
     dataset_dir = output_dir / "dataset"
+    if log:
+        log(f"output folder: {output_dir}")
+        log(f"preparing dataset at {config.sample_rate} Hz with {config.segment_seconds:g}s segments")
     report = prepare_dataset(
         raw_data_dir,
         dataset_dir,
         segment_seconds=config.segment_seconds,
         sample_rate=config.sample_rate,
+        log=log,
     )
     if not report["items"]:
         raise RuntimeError("dataset preparation produced no usable audio segments")
 
     if config.backend == "managed":
         manager = BackendRuntimeManager()
+        if log:
+            log("selecting packaged training backend")
         runtime_backend = (
             manager.require_training_backend(config.runtime_backend)
             if config.runtime_backend
             else manager.select_training_backend()
         )
+        if log:
+            log(f"selected backend: {runtime_backend}")
         result = manager.invoke(
             runtime_backend,
             "train",
@@ -110,6 +120,7 @@ def train_model(
                 "batch_size": config.batch_size,
                 "f0_method": config.f0_method,
             },
+            log=log,
         )
         package = _package_from_runtime(
             display_name=display_name,
@@ -119,6 +130,8 @@ def train_model(
             result=result,
         )
     elif config.backend == "simple-timbre":
+        if log:
+            log("training simple-timbre profile")
         simple_profile = train_simple_timbre(dataset_dir / "wavs", output_dir / "simple_timbre.json", config.sample_rate)
         package = ModelPackage(
             display_name=display_name,
@@ -166,9 +179,13 @@ def train_model(
         raise ValueError(f"unknown training backend: {config.backend}")
 
     model_yaml = output_dir / "model.yaml"
+    if log:
+        log(f"writing model package: {model_yaml}")
     package.write_yaml(model_yaml)
     (output_dir / "training_report.json").write_text(
         json.dumps({"model_yaml": str(model_yaml), "dataset_report": report}, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+    if log:
+        log("training artifacts written")
     return ModelPackage.from_yaml(model_yaml)

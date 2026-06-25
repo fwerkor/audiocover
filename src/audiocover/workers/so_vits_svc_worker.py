@@ -52,6 +52,7 @@ def train(payload: dict[str, Any]) -> dict[str, Any]:
     if f0_method not in {"crepe", "crepe-tiny", "parselmouth", "dio", "harvest"}:
         f0_method = "dio"
 
+    print("so-vits-svc: preprocessing audio", flush=True)
     pre_resample.callback(
         input_dir=workdir / "dataset_raw",
         output_dir=dataset_dir,
@@ -61,6 +62,7 @@ def train(payload: dict[str, Any]) -> dict[str, Any]:
         frame_seconds=1,
         hop_seconds=0.3,
     )
+    print("so-vits-svc: writing filelists and config", flush=True)
     pre_config.callback(
         input_dir=dataset_dir,
         filelist_path=filelist_dir,
@@ -73,6 +75,7 @@ def train(payload: dict[str, Any]) -> dict[str, Any]:
         train_cfg["epochs"] = int(payload.get("epochs") or train_cfg.get("epochs") or 200)
         train_cfg["batch_size"] = int(payload.get("batch_size") or train_cfg.get("batch_size") or 8)
         config_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"so-vits-svc: extracting features and f0 with {f0_method}", flush=True)
     pre_hubert.callback(
         input_dir=dataset_dir,
         config_path=config_path,
@@ -80,12 +83,14 @@ def train(payload: dict[str, Any]) -> dict[str, Any]:
         force_rebuild=True,
         f0_method=f0_method,
     )
+    print("so-vits-svc: starting model training", flush=True)
     svc_train.callback(
         config_path=config_path,
         model_path=model_dir,
         tensorboard=False,
         reset_optimizer=False,
     )
+    print("so-vits-svc: locating trained checkpoint", flush=True)
     candidates = sorted(model_dir.glob("G_*.pth"), key=lambda path: path.stat().st_mtime)
     if not candidates:
         raise RuntimeError(f"So-VITS-SVC training did not produce a G_*.pth model in {model_dir}")

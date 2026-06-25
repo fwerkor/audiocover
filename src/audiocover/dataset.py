@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
@@ -21,6 +22,7 @@ def prepare_dataset(
     *,
     segment_seconds: float = 12.0,
     sample_rate: int = 48000,
+    log: Callable[[str], None] | None = None,
 ) -> dict:
     output_dir.mkdir(parents=True, exist_ok=True)
     wav_dir = output_dir / "wavs"
@@ -31,8 +33,13 @@ def prepare_dataset(
     items: list[dict] = []
     rejected: list[dict] = []
     segment_len = int(segment_seconds * sample_rate)
+    sources = discover_audio_files(input_dir)
+    if log:
+        log(f"discovered {len(sources)} audio file(s) in {input_dir}")
 
-    for src in discover_audio_files(input_dir):
+    for source_index, src in enumerate(sources, start=1):
+        if log:
+            log(f"preparing source {source_index}/{len(sources)}: {src.name}")
         try:
             temp = converted_dir / f"{src.stem}.wav"
             convert_to_wav(src, temp, sample_rate, channels=1)
@@ -42,6 +49,7 @@ def prepare_dataset(
                 continue
 
             n_segments = max(1, int(np.ceil(len(data) / segment_len)))
+            accepted_before = len(items)
             for i in range(n_segments):
                 chunk = data[i * segment_len : (i + 1) * segment_len]
                 if len(chunk) < sr * 2:
@@ -65,9 +73,16 @@ def prepare_dataset(
                         "warnings": qc["warnings"],
                     }
                 )
+            if log:
+                accepted_now = len(items) - accepted_before
+                log(f"accepted {accepted_now}/{n_segments} segment(s) from {src.name}; total accepted: {len(items)}")
         except Exception as exc:
             rejected.append({"source": str(src), "reason": repr(exc)})
+            if log:
+                log(f"rejected {src.name}: {exc!r}")
 
+    if log:
+        log(f"dataset preparation complete: {len(items)} usable segment(s), {len(rejected)} rejected item(s)")
     report = {"items": items, "rejected": rejected}
     (output_dir / "report.json").write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
     (output_dir / "manifest.jsonl").write_text(

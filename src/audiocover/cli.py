@@ -55,7 +55,13 @@ def prepare_dataset(
     segment_seconds: Annotated[float, typer.Option(min=2.0, max=30.0)] = 12.0,
     sample_rate: int = 48000,
 ) -> None:
-    report = prepare_dataset_impl(input_dir, output_dir, segment_seconds=segment_seconds, sample_rate=sample_rate)
+    report = prepare_dataset_impl(
+        input_dir,
+        output_dir,
+        segment_seconds=segment_seconds,
+        sample_rate=sample_rate,
+        log=console.print,
+    )
     console.print(f"accepted={len(report['items'])} rejected={len(report['rejected'])}")
     console.print(f"report={output_dir / 'report.json'}")
 
@@ -83,7 +89,14 @@ def train(
         batch_size=batch_size,
         commands=command or [],
     )
-    package = train_model(raw_data_dir, output_dir, display_name=display_name, config=cfg, consent=consent)
+    package = train_model(
+        raw_data_dir,
+        output_dir,
+        display_name=display_name,
+        config=cfg,
+        consent=consent,
+        log=console.print,
+    )
     console.print(f"model package: {output_dir / 'model.yaml'}")
     console.print(package.model_dump_json(indent=2))
 

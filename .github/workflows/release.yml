@@ -109,25 +109,25 @@ jobs:
             name: macos-arm64
             os: macos-latest
           - backend: so-vits-svc
-            packages: '"so-vits-svc-fork==4.2.30"'
+            packages: '"so-vits-svc-fork==4.2.30" "scikit-learn>=1.4.0"'
             pip: pip
             python: '3.12'
             name: windows-x64
             os: windows-latest
           - backend: so-vits-svc
-            packages: '"so-vits-svc-fork==4.2.30"'
+            packages: '"so-vits-svc-fork==4.2.30" "scikit-learn>=1.4.0"'
             pip: pip
             python: '3.12'
             name: linux-x64
             os: ubuntu-latest
           - backend: so-vits-svc
-            packages: '"so-vits-svc-fork==4.2.30"'
+            packages: '"so-vits-svc-fork==4.2.30" "scikit-learn>=1.4.0"'
             pip: pip
             python: '3.12'
             name: linux-arm64
             os: ubuntu-24.04-arm
           - backend: so-vits-svc
-            packages: '"so-vits-svc-fork==4.2.30"'
+            packages: '"so-vits-svc-fork==4.2.30" "scikit-learn>=1.4.0"'
             pip: pip
             python: '3.12'
             name: macos-arm64

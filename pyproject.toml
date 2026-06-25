@@ -46,9 +46,6 @@ demucs-backend = [
   "torchaudio>=2.2.0",
   "demucs>=4.0.1",
 ]
-rvc-backend = [
-  "rvc-python==0.1.5",
-]
 so-vits-svc-backend = [
   "so-vits-svc-fork==4.2.30",
 ]

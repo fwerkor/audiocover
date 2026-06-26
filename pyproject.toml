@@ -52,6 +52,7 @@ so-vits-svc-backend = [
   "torchaudio>=2.2.0",
   "tensorboard>=2.16.0",
   "scikit-learn>=1.4.0",
+  "tqdm-joblib>=0.0.4",
 ]
 dev = [
   "pytest>=8.2.0",

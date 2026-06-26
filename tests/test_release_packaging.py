@@ -31,6 +31,7 @@ def test_so_vits_backend_extra_declares_decoder_dependencies() -> None:
         "torchaudio>=2.2.0",
         "tensorboard>=2.16.0",
         "scikit-learn>=1.4.0",
+        "tqdm-joblib>=0.0.4",
     ):
         assert dependency in normalized
 
@@ -44,6 +45,7 @@ def test_release_matrix_installs_so_vits_decoder_dependencies() -> None:
         "torchaudio>=2.2.0",
         "tensorboard>=2.16.0",
         "scikit-learn>=1.4.0",
+        "tqdm-joblib>=0.0.4",
     ):
         assert workflow.count(dependency) >= 4
 

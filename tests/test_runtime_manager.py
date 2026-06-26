@@ -149,6 +149,51 @@ def test_so_vits_worker_copies_bundled_init_checkpoints(tmp_path: Path, monkeypa
     assert (model_dir / "G_0.pth").read_bytes() == b"g"
 
 
+def test_so_vits_worker_skips_pretrained_lookup_when_local_checkpoints_exist(tmp_path: Path) -> None:
+    from types import SimpleNamespace
+
+    from audiocover.workers import so_vits_svc_worker
+
+    model_dir = tmp_path / "model"
+    model_dir.mkdir()
+    (model_dir / "D_0.pth").write_bytes(b"d")
+    (model_dir / "G_0.pth").write_bytes(b"g")
+    calls = []
+
+    def broken_lookup(*args, **kwargs):
+        calls.append((args, kwargs))
+        raise TypeError("unhashable type: 'dict'")
+
+    svc_utils = SimpleNamespace(ensure_pretrained_model=broken_lookup)
+    svc_train_module = SimpleNamespace(ensure_pretrained_model=broken_lookup)
+
+    so_vits_svc_worker._install_pretrained_model_compat(model_dir, svc_utils, svc_train_module)
+    svc_train_module.ensure_pretrained_model({"nested": "candidate"})
+
+    assert calls == []
+
+
+def test_so_vits_worker_reports_pretrained_lookup_failure_without_local_checkpoints(
+    tmp_path: Path,
+) -> None:
+    from types import SimpleNamespace
+
+    from audiocover.workers import so_vits_svc_worker
+
+    def broken_lookup(*args, **kwargs):
+        raise TypeError("unhashable type: 'dict'")
+
+    svc_utils = SimpleNamespace(ensure_pretrained_model=broken_lookup)
+    so_vits_svc_worker._install_pretrained_model_compat(tmp_path / "model", svc_utils)
+
+    try:
+        svc_utils.ensure_pretrained_model(tmp_path / "model", {"nested": "candidate"})
+    except RuntimeError as exc:
+        assert "pretrained checkpoint lookup failed" in str(exc)
+    else:
+        raise AssertionError("expected pretrained lookup compatibility error")
+
+
 def test_runtime_manager_ignores_non_object_json_logs(tmp_path: Path) -> None:
     runtime_root = tmp_path / "backend-runtimes"
     _write_fake_runtime(

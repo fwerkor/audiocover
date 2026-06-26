@@ -156,6 +156,52 @@ def _copy_bundled_init_checkpoints(model_dir: Path) -> None:
         print("so-vits-svc: initialization checkpoints already present", flush=True)
 
 
+def _install_pretrained_model_compat(
+    model_dir: Path,
+    svc_utils: Any,
+    svc_train_module: Any | None = None,
+) -> None:
+    original = getattr(svc_utils, "ensure_pretrained_model", None)
+    if original is None or getattr(original, "_audiocover_patch", False):
+        return
+
+    def ensure_pretrained_model_compat(*args, **kwargs):
+        checkpoint_dir = model_dir
+        for value in (*args, kwargs.get("model_dir"), kwargs.get("model_path"), kwargs.get("path")):
+            if isinstance(value, (str, os.PathLike)):
+                checkpoint_dir = Path(value)
+                break
+        if (checkpoint_dir / "G_0.pth").is_file() and (checkpoint_dir / "D_0.pth").is_file():
+            print(
+                "so-vits-svc: using local initialization checkpoints; skipping pretrained lookup",
+                flush=True,
+            )
+            return None
+        try:
+            return original(*args, **kwargs)
+        except TypeError as exc:
+            if "unhashable type" not in str(exc):
+                raise
+            raise RuntimeError(
+                "So-VITS-SVC pretrained checkpoint lookup failed before local initialization "
+                "checkpoints were available. This usually means the packaged "
+                "so-vits-svc-init assets are missing or were not copied into the model log "
+                "directory."
+            ) from exc
+
+    ensure_pretrained_model_compat._audiocover_patch = True  # type: ignore[attr-defined]
+    svc_utils.ensure_pretrained_model = ensure_pretrained_model_compat
+    if svc_train_module is not None and hasattr(svc_train_module, "ensure_pretrained_model"):
+        svc_train_module.ensure_pretrained_model = ensure_pretrained_model_compat
+
+
+def _patch_so_vits_pretrained_model_lookup(model_dir: Path) -> None:
+    from so_vits_svc_fork import train as svc_train_module
+    from so_vits_svc_fork import utils as svc_utils
+
+    _install_pretrained_model_compat(model_dir, svc_utils, svc_train_module)
+
+
 def _check_required_dependencies() -> str | None:
     failures: list[str] = []
     for module_name, package_name in _REQUIRED_IMPORTS:
@@ -395,6 +441,7 @@ def train(payload: dict[str, Any]) -> dict[str, Any]:
     )
     print("so-vits-svc: starting model training", flush=True)
     _copy_bundled_init_checkpoints(model_dir)
+    _patch_so_vits_pretrained_model_lookup(model_dir)
     _patch_lightning_rich_summary()
     logging.getLogger("lightning.pytorch.utilities.rank_zero").disabled = True
     svc_train.callback(

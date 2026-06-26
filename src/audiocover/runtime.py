@@ -228,6 +228,8 @@ class BackendRuntimeManager:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             bufsize=1,
             env=env,
         )
@@ -252,25 +254,12 @@ class BackendRuntimeManager:
 
         def read_stream(stream_name: str, lines: list[str], stream) -> None:
             assert stream is not None
-            pending = ""
-
-            def emit(text: str) -> None:
-                line = text.rstrip("\r\n")
+            for raw_line in stream:
+                line = raw_line.rstrip("\r\n")
                 if not line:
-                    return
+                    continue
                 lines.append(line)
                 events.put((stream_name, line))
-
-            while True:
-                chunk = stream.read(1)
-                if chunk == "":
-                    break
-                if chunk in {"\r", "\n"}:
-                    emit(pending)
-                    pending = ""
-                else:
-                    pending += chunk
-            emit(pending)
 
         threads = [
             threading.Thread(target=read_stream, args=("stdout", stdout_lines, process.stdout), daemon=True),

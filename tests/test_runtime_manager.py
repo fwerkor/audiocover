@@ -261,3 +261,22 @@ def test_so_vits_worker_availability_runs_hubert_self_test(monkeypatch) -> None:
     assert not available
     assert reason is not None
     assert "HuBERT import self-test failed" in reason
+
+
+def test_so_vits_worker_availability_runs_training_entrypoint_self_test(monkeypatch) -> None:
+    from audiocover.workers import so_vits_svc_worker
+
+    monkeypatch.setattr(so_vits_svc_worker, "_check_required_dependencies", lambda: None)
+    monkeypatch.setattr(so_vits_svc_worker, "_hubert_import_self_test", lambda: None)
+    monkeypatch.setattr(so_vits_svc_worker, "_torchaudio_decode_self_test", lambda: None)
+    monkeypatch.setattr(
+        so_vits_svc_worker,
+        "_train_entrypoint_self_test",
+        lambda: "So-VITS-SVC training entrypoint self-test failed: probe",
+    )
+
+    available, reason = so_vits_svc_worker._available()
+
+    assert not available
+    assert reason is not None
+    assert "training entrypoint self-test failed" in reason

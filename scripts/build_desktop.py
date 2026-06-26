@@ -40,13 +40,15 @@ WORKER_SETS = {
 }
 WORKER_COLLECTS = {
     "rvc": ("rvc_python",),
-    "so-vits-svc": ("so_vits_svc_fork", "librosa", "sklearn"),
+    "so-vits-svc": ("so_vits_svc_fork", "librosa", "sklearn", "tensorboard"),
     "demucs-separator": ("demucs",),
 }
 WORKER_HIDDEN_IMPORTS = {
     "so-vits-svc": (
         "transformers.models.hubert.modeling_hubert",
         "torch._inductor.test_operators",
+        "torch.utils.tensorboard",
+        "torch.utils.tensorboard.writer",
     ),
 }
 RUNTIME_SELF_TESTS = {
@@ -85,7 +87,6 @@ WORKER_EXCLUDES = (
     "torch.distributed._shard.checkpoint",
     "torch.distributed._sharded_tensor",
     "torch.distributed._sharding_spec",
-    "torch.utils.tensorboard",
     "triton",
 )
 

@@ -29,6 +29,7 @@ def test_so_vits_backend_extra_declares_decoder_dependencies() -> None:
         "so-vits-svc-fork==4.2.30",
         "torch>=2.2.0",
         "torchaudio>=2.2.0",
+        "tensorboard>=2.16.0",
         "scikit-learn>=1.4.0",
     ):
         assert dependency in normalized
@@ -41,6 +42,7 @@ def test_release_matrix_installs_so_vits_decoder_dependencies() -> None:
         "so-vits-svc-fork==4.2.30",
         "torch>=2.2.0",
         "torchaudio>=2.2.0",
+        "tensorboard>=2.16.0",
         "scikit-learn>=1.4.0",
     ):
         assert workflow.count(dependency) >= 4
@@ -50,6 +52,7 @@ def test_build_script_self_tests_so_vits_runtime_without_torchcodec() -> None:
     build_desktop = _build_desktop_module()
 
     assert "torchcodec" not in build_desktop.WORKER_COLLECTS["so-vits-svc"]
+    assert "tensorboard" in build_desktop.WORKER_COLLECTS["so-vits-svc"]
     assert build_desktop.RUNTIME_SELF_TESTS["so-vits-svc"] == "self_test"
 
 
@@ -59,4 +62,7 @@ def test_so_vits_runtime_pack_includes_hubert_import_chain() -> None:
     hidden_imports = build_desktop.WORKER_HIDDEN_IMPORTS["so-vits-svc"]
     assert "transformers.models.hubert.modeling_hubert" in hidden_imports
     assert "torch._inductor.test_operators" in hidden_imports
+    assert "torch.utils.tensorboard" in hidden_imports
+    assert "torch.utils.tensorboard.writer" in hidden_imports
     assert "torch._inductor" not in build_desktop.WORKER_EXCLUDES
+    assert "torch.utils.tensorboard" not in build_desktop.WORKER_EXCLUDES

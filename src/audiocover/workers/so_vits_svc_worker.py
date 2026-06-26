@@ -16,6 +16,8 @@ _REQUIRED_IMPORTS: tuple[tuple[str, str], ...] = (
     ("so_vits_svc_fork", "so-vits-svc-fork"),
     ("torch", "torch"),
     ("torchaudio", "torchaudio"),
+    ("tensorboard", "tensorboard"),
+    ("torch.utils.tensorboard", "torch.utils.tensorboard"),
     ("soundfile", "soundfile"),
     ("librosa", "librosa"),
     ("sklearn", "scikit-learn"),
@@ -235,6 +237,19 @@ def _torchaudio_decode_self_test() -> str | None:
     return None
 
 
+def _train_entrypoint_self_test() -> str | None:
+    try:
+        from so_vits_svc_fork import train as svc_train_module
+        from torch.utils.tensorboard.writer import SummaryWriter
+    except Exception as exc:
+        return f"So-VITS-SVC training entrypoint self-test failed: {type(exc).__name__}: {exc}"
+    if not hasattr(svc_train_module, "train"):
+        return "So-VITS-SVC training entrypoint self-test failed: train command is unavailable"
+    if SummaryWriter is None:
+        return "So-VITS-SVC training entrypoint self-test failed: SummaryWriter is unavailable"
+    return None
+
+
 def _available() -> tuple[bool, str | None]:
     dependency_error = _check_required_dependencies()
     if dependency_error:
@@ -245,6 +260,9 @@ def _available() -> tuple[bool, str | None]:
     decode_error = _torchaudio_decode_self_test()
     if decode_error:
         return False, decode_error
+    train_error = _train_entrypoint_self_test()
+    if train_error:
+        return False, train_error
     asset_error = _asset_self_test()
     if asset_error:
         return False, asset_error
@@ -270,6 +288,7 @@ def self_test(_: dict[str, Any]) -> dict[str, Any]:
             "required imports",
             "transformers HuBERT import",
             "torchaudio WAV decoder",
+            "training entrypoint and tensorboard writer",
             "bundled assets",
         ],
         "ok": True,

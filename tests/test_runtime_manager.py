@@ -203,12 +203,12 @@ def test_so_vits_worker_missing_init_checkpoints_fails_closed(tmp_path: Path, mo
         raise AssertionError("expected missing initialization checkpoints to fail")
 
 
-def test_so_vits_worker_reports_missing_decoder_dependency(monkeypatch) -> None:
+def test_so_vits_worker_reports_missing_audio_dependency(monkeypatch) -> None:
     from audiocover.workers import so_vits_svc_worker
 
     def fake_import_module(module_name: str):
-        if module_name == "torchcodec":
-            raise ModuleNotFoundError("No module named 'torchcodec'")
+        if module_name == "torchaudio":
+            raise ModuleNotFoundError("No module named 'torchaudio'")
         return object()
 
     monkeypatch.setattr(so_vits_svc_worker.importlib, "import_module", fake_import_module)
@@ -216,7 +216,7 @@ def test_so_vits_worker_reports_missing_decoder_dependency(monkeypatch) -> None:
     reason = so_vits_svc_worker._check_required_dependencies()
 
     assert reason is not None
-    assert "torchcodec" in reason
+    assert "torchaudio" in reason
 
 
 def test_so_vits_worker_availability_runs_decoder_self_test(monkeypatch) -> None:

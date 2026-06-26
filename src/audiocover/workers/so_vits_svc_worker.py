@@ -16,7 +16,6 @@ _REQUIRED_IMPORTS: tuple[tuple[str, str], ...] = (
     ("so_vits_svc_fork", "so-vits-svc-fork"),
     ("torch", "torch"),
     ("torchaudio", "torchaudio"),
-    ("torchcodec", "torchcodec"),
     ("soundfile", "soundfile"),
     ("librosa", "librosa"),
     ("sklearn", "scikit-learn"),
@@ -162,10 +161,44 @@ def _write_probe_wav(path: Path, *, sample_rate: int = 16000) -> None:
         handle.writeframes(bytes(frames))
 
 
+def _patch_torchaudio_wav_loader() -> None:
+    import soundfile as sf
+    import torch
+    import torchaudio
+
+    if getattr(torchaudio.load, "_audiocover_wav_patch", False):
+        return
+    original_load = torchaudio.load
+
+    def load_with_soundfile_wav(path, *args, **kwargs):
+        path_string = os.fspath(path) if isinstance(path, (str, os.PathLike)) else ""
+        if path_string.lower().endswith(".wav"):
+            frame_offset = int(kwargs.get("frame_offset", 0) or 0)
+            num_frames = int(kwargs.get("num_frames", -1) or -1)
+            channels_first = bool(kwargs.get("channels_first", True))
+            frames = None if num_frames < 0 else num_frames
+            data, sample_rate = sf.read(
+                path_string,
+                start=frame_offset,
+                frames=frames,
+                dtype="float32",
+                always_2d=True,
+            )
+            audio = torch.from_numpy(data)
+            if channels_first:
+                audio = audio.transpose(0, 1).contiguous()
+            return audio, sample_rate
+        return original_load(path, *args, **kwargs)
+
+    load_with_soundfile_wav._audiocover_wav_patch = True  # type: ignore[attr-defined]
+    torchaudio.load = load_with_soundfile_wav
+
+
 def _torchaudio_decode_self_test() -> str | None:
     try:
         import torchaudio
 
+        _patch_torchaudio_wav_loader()
         with tempfile.TemporaryDirectory(prefix="audiocover-svc-probe-") as temp_dir:
             probe = Path(temp_dir) / "probe.wav"
             _write_probe_wav(probe)
@@ -217,6 +250,7 @@ def train(payload: dict[str, Any]) -> dict[str, Any]:
     from so_vits_svc_fork.__main__ import train as svc_train
 
     _patch_contentvec_loader()
+    _patch_torchaudio_wav_loader()
 
     dataset_wavs = Path(payload["dataset_wavs"])
     output_dir = Path(payload["output_dir"])
@@ -300,6 +334,7 @@ def convert(payload: dict[str, Any]) -> dict[str, Any]:
     from so_vits_svc_fork.inference.main import infer
 
     _patch_contentvec_loader()
+    _patch_torchaudio_wav_loader()
 
     model_path = payload.get("model_path")
     config_path = payload.get("config_path")

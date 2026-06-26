@@ -40,7 +40,7 @@ WORKER_SETS = {
 }
 WORKER_COLLECTS = {
     "rvc": ("rvc_python",),
-    "so-vits-svc": ("so_vits_svc_fork", "librosa", "sklearn", "torchcodec"),
+    "so-vits-svc": ("so_vits_svc_fork", "librosa", "sklearn"),
     "demucs-separator": ("demucs",),
 }
 RUNTIME_SELF_TESTS = {

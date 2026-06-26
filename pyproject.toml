@@ -50,7 +50,6 @@ so-vits-svc-backend = [
   "so-vits-svc-fork==4.2.30",
   "torch>=2.2.0",
   "torchaudio>=2.2.0",
-  "torchcodec>=0.8.0",
   "scikit-learn>=1.4.0",
 ]
 dev = [

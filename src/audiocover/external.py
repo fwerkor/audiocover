@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import shlex
-import subprocess
 from pathlib import Path
 from typing import Any
+
+from .process import run_hidden
 
 
 def expand_template(template: str, **values: Any) -> list[str]:
@@ -13,7 +14,7 @@ def expand_template(template: str, **values: Any) -> list[str]:
 
 def run_template(template: str, log_file: Path | None = None, **values: Any) -> None:
     cmd = expand_template(template, **values)
-    process = subprocess.run(cmd, text=True, capture_output=True)
+    process = run_hidden(cmd, text=True, capture_output=True)
     if log_file:
         log_file.parent.mkdir(parents=True, exist_ok=True)
         log_file.write_text(

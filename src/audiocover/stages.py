@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import subprocess
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -27,6 +26,7 @@ from .config import (
     resolve_separator_config,
 )
 from .external import run_template
+from .process import run_hidden
 from .runtime import BackendRuntimeManager
 from .simple_timbre import apply_simple_timbre
 
@@ -106,7 +106,7 @@ def separate(input_wav: Path, out_dir: Path, cfg: SeparatorConfig) -> Stems:
         cmd.insert(-2, "--segment")
     cmd.extend(cfg.extra_args)
 
-    process = subprocess.run(cmd, text=True, capture_output=True)
+    process = run_hidden(cmd, text=True, capture_output=True)
     (out_dir / "demucs.log").write_text(
         "COMMAND\n" + " ".join(cmd) + "\n\nSTDOUT\n" + process.stdout + "\n\nSTDERR\n" + process.stderr,
         encoding="utf-8",

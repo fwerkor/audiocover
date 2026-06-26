@@ -13,6 +13,8 @@ from functools import cached_property
 from pathlib import Path
 from typing import Any
 
+from .process import popen_hidden
+
 
 class BackendRuntimeError(RuntimeError):
     pass
@@ -174,7 +176,7 @@ class BackendRuntimeManager:
 
         env = os.environ.copy()
         env.setdefault("PYTHONUNBUFFERED", "1")
-        process = subprocess.Popen(
+        process = popen_hidden(
             list(runtime.command),
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,

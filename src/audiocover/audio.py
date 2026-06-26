@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import math
 import shutil
-import subprocess
 from math import gcd
 from pathlib import Path
 
 import numpy as np
 import soundfile as sf
 from scipy import signal
+
+from .process import run_hidden
 
 
 def db_to_gain(db):
@@ -24,7 +25,7 @@ def peak_dbfs(data: np.ndarray) -> float:
 
 
 def run_command(args: list[str], *, log_file: Path | None = None) -> None:
-    process = subprocess.run(args, text=True, capture_output=True)
+    process = run_hidden(args, text=True, capture_output=True)
     if log_file:
         log_file.parent.mkdir(parents=True, exist_ok=True)
         log_file.write_text(

@@ -1,12 +1,28 @@
 from __future__ import annotations
 
-import importlib.util
+import importlib
+import math
 import os
+import struct
 import sys
+import tempfile
+import wave
 from pathlib import Path
 from typing import Any
 
 from audiocover.workers.json_worker import serve
+
+_REQUIRED_IMPORTS: tuple[tuple[str, str], ...] = (
+    ("so_vits_svc_fork", "so-vits-svc-fork"),
+    ("torch", "torch"),
+    ("torchaudio", "torchaudio"),
+    ("torchcodec", "torchcodec"),
+    ("soundfile", "soundfile"),
+    ("librosa", "librosa"),
+    ("sklearn", "scikit-learn"),
+    ("transformers", "transformers"),
+    ("joblib", "joblib"),
+)
 
 
 def _asset_dir(name: str, required_files: tuple[str, ...]) -> Path | None:
@@ -121,9 +137,53 @@ def _copy_bundled_init_checkpoints(model_dir: Path) -> None:
         print("so-vits-svc: initialization checkpoints already present", flush=True)
 
 
+def _check_required_dependencies() -> str | None:
+    failures: list[str] = []
+    for module_name, package_name in _REQUIRED_IMPORTS:
+        try:
+            importlib.import_module(module_name)
+        except Exception as exc:
+            failures.append(f"{package_name}: {type(exc).__name__}: {exc}")
+    if failures:
+        return "missing or broken So-VITS-SVC runtime dependencies: " + "; ".join(failures)
+    return None
+
+
+def _write_probe_wav(path: Path, *, sample_rate: int = 16000) -> None:
+    frame_count = sample_rate // 20
+    with wave.open(str(path), "wb") as handle:
+        handle.setnchannels(1)
+        handle.setsampwidth(2)
+        handle.setframerate(sample_rate)
+        frames = bytearray()
+        for index in range(frame_count):
+            value = int(32767 * 0.05 * math.sin(2 * math.pi * 440 * index / sample_rate))
+            frames.extend(struct.pack("<h", value))
+        handle.writeframes(bytes(frames))
+
+
+def _torchaudio_decode_self_test() -> str | None:
+    try:
+        import torchaudio
+
+        with tempfile.TemporaryDirectory(prefix="audiocover-svc-probe-") as temp_dir:
+            probe = Path(temp_dir) / "probe.wav"
+            _write_probe_wav(probe)
+            audio, sample_rate = torchaudio.load(str(probe))
+        if sample_rate != 16000 or getattr(audio, "numel", lambda: 0)() <= 0:
+            return "torchaudio WAV decoder returned an invalid probe result"
+    except Exception as exc:
+        return f"torchaudio WAV decoder self-test failed: {type(exc).__name__}: {exc}"
+    return None
+
+
 def _available() -> tuple[bool, str | None]:
-    if importlib.util.find_spec("so_vits_svc_fork") is None:
-        return False, "so-vits-svc-fork is not present in this isolated worker runtime"
+    dependency_error = _check_required_dependencies()
+    if dependency_error:
+        return False, dependency_error
+    decode_error = _torchaudio_decode_self_test()
+    if decode_error:
+        return False, decode_error
     return True, None
 
 
@@ -135,6 +195,13 @@ def capabilities(_: dict[str, Any]) -> dict[str, Any]:
         "description": "So-VITS-SVC isolated training and inference worker",
         "reason": reason,
     }
+
+
+def self_test(_: dict[str, Any]) -> dict[str, Any]:
+    available, reason = _available()
+    if not available:
+        raise RuntimeError(reason)
+    return {"checks": ["required imports", "torchaudio WAV decoder"], "ok": True}
 
 
 def train(payload: dict[str, Any]) -> dict[str, Any]:
@@ -265,7 +332,7 @@ def convert(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def main() -> None:
-    serve({"capabilities": capabilities, "train": train, "convert": convert})
+    serve({"capabilities": capabilities, "self_test": self_test, "train": train, "convert": convert})
 
 
 if __name__ == "__main__":

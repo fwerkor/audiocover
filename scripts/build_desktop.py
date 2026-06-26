@@ -40,8 +40,11 @@ WORKER_SETS = {
 }
 WORKER_COLLECTS = {
     "rvc": ("rvc_python",),
-    "so-vits-svc": ("so_vits_svc_fork", "librosa", "sklearn"),
+    "so-vits-svc": ("so_vits_svc_fork", "librosa", "sklearn", "torchcodec"),
     "demucs-separator": ("demucs",),
+}
+RUNTIME_SELF_TESTS = {
+    "so-vits-svc": "self_test",
 }
 RUNTIME_ASSETS = {
     "so-vits-svc": (
@@ -256,6 +259,16 @@ def smoke_test_workers(
         )
         if require_available and not result.get("available"):
             raise RuntimeError(f"runtime pack worker is inactive: {worker_name}: {result.get('reason')}")
+        self_test_action = RUNTIME_SELF_TESTS.get(worker_name)
+        if result.get("available") and self_test_action:
+            self_test = _capture_json(
+                [str(executable)],
+                input_json={"id": "self-test", "action": self_test_action, "payload": {}},
+            )
+            print(
+                f"runtime {worker_name}: self-test passed checks={self_test.get('checks', [])}",
+                flush=True,
+            )
 
     if "simple-timbre" in worker_names:
         simple = _capture_json(

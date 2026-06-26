@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import logging
 import math
 import os
 import struct
@@ -11,6 +12,21 @@ from pathlib import Path
 from typing import Any
 
 from audiocover.workers.json_worker import serve
+
+
+def _configure_backend_process() -> None:
+    os.environ.setdefault("PYTHONUTF8", "1")
+    os.environ.setdefault("PYTHONIOENCODING", "utf-8:replace")
+    os.environ.setdefault("NO_COLOR", "1")
+    os.environ.setdefault("RICH_FORCE_TERMINAL", "0")
+    os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            reconfigure(encoding="utf-8", errors="replace")
+
+
+_configure_backend_process()
 
 _REQUIRED_IMPORTS: tuple[tuple[str, str], ...] = (
     ("so_vits_svc_fork", "so-vits-svc-fork"),
@@ -250,6 +266,22 @@ def _train_entrypoint_self_test() -> str | None:
     return None
 
 
+def _patch_lightning_rich_summary() -> None:
+    try:
+        from lightning.pytorch.callbacks.rich_model_summary import RichModelSummary
+    except Exception:
+        return
+
+    if getattr(RichModelSummary.on_fit_start, "_audiocover_patch", False):
+        return
+
+    def on_fit_start_noop(self, trainer, pl_module) -> None:
+        return None
+
+    on_fit_start_noop._audiocover_patch = True  # type: ignore[attr-defined]
+    RichModelSummary.on_fit_start = on_fit_start_noop
+
+
 def _available() -> tuple[bool, str | None]:
     dependency_error = _check_required_dependencies()
     if dependency_error:
@@ -350,6 +382,8 @@ def train(payload: dict[str, Any]) -> dict[str, Any]:
         train_cfg = data.setdefault("train", {})
         train_cfg["epochs"] = int(payload.get("epochs") or train_cfg.get("epochs") or 200)
         train_cfg["batch_size"] = int(payload.get("batch_size") or train_cfg.get("batch_size") or 8)
+        model_cfg = data.setdefault("model", {})
+        model_cfg.pop("pretrained", None)
         config_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"so-vits-svc: extracting features and f0 with {f0_method}", flush=True)
     pre_hubert.callback(
@@ -361,6 +395,8 @@ def train(payload: dict[str, Any]) -> dict[str, Any]:
     )
     print("so-vits-svc: starting model training", flush=True)
     _copy_bundled_init_checkpoints(model_dir)
+    _patch_lightning_rich_summary()
+    logging.getLogger("lightning.pytorch.utilities.rank_zero").disabled = True
     svc_train.callback(
         config_path=config_path,
         model_path=model_dir,

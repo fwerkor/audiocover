@@ -163,6 +163,37 @@ def test_runtime_manager_ignores_non_object_json_logs(tmp_path: Path) -> None:
     assert manager.invoke("simple-timbre", "train", {}) == {"value": 9}
 
 
+
+def test_runtime_manager_finds_json_response_embedded_after_logs(tmp_path: Path) -> None:
+    runtime_root = tmp_path / "backend-runtimes"
+    _write_fake_runtime(
+        runtime_root,
+        "import json, sys\n"
+        "req=json.loads(sys.stdin.read())\n"
+        "print('INFO prefix without protocol newline ' + json.dumps({'id': req['id'], 'ok': True, 'result': {'value': 11}}), flush=True)\n",
+    )
+
+    manager = BackendRuntimeManager(runtime_roots=[runtime_root])
+    assert manager.invoke("simple-timbre", "train", {}) == {"value": 11}
+
+
+def test_runtime_manager_coalesces_tqdm_progress_lines(tmp_path: Path) -> None:
+    runtime_root = tmp_path / "backend-runtimes"
+    _write_fake_runtime(
+        runtime_root,
+        "import json, sys\n"
+        "req=json.loads(sys.stdin.read())\n"
+        "print(' 91%|█████████ | 173/191 [01:57<00:12,  1.45it/s]', file=sys.stderr, flush=True)\n"
+        "print(json.dumps({'id': req['id'], 'ok': True, 'result': {'value': 12}}), flush=True)\n",
+    )
+
+    logs: list[str] = []
+    manager = BackendRuntimeManager(runtime_roots=[runtime_root])
+
+    assert manager.invoke("simple-timbre", "train", {}, log=logs.append) == {"value": 12}
+    assert any(line.startswith("\rsimple-timbre progress: 91% (173/191)") for line in logs)
+    assert not any("████" in line for line in logs)
+
 def test_runtime_manager_reports_missing_worker_response(tmp_path: Path) -> None:
     runtime_root = tmp_path / "backend-runtimes"
     _write_fake_runtime(

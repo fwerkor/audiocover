@@ -44,6 +44,7 @@ class AudioCoverGui:
         self.root.title("AudioCover")
         self.root.geometry("920x720")
         self.log_queue: queue.Queue[str] = queue.Queue()
+        self._last_log_was_progress = False
         self.worker = Worker(self.log_queue)
 
         notebook = ttk.Notebook(self.root)
@@ -144,6 +145,13 @@ class AudioCoverGui:
         self.logs.pack(fill="both", expand=True)
         ttk.Button(self.log_frame, text="Clear", command=lambda: self.logs.delete("1.0", "end")).pack(anchor="e", pady=4)
 
+    def _log_with_scope(self, scope: str, message: str) -> None:
+        prefix = f"[{scope}] "
+        if message.startswith("\r"):
+            self.log_queue.put("\r" + prefix + message[1:])
+        else:
+            self.log_queue.put(prefix + message)
+
     def _start_training(self) -> None:
         if not self.train_consent.get():
             messagebox.showerror("Consent required", "Confirm that you own or are authorized to use the recordings.")
@@ -157,7 +165,7 @@ class AudioCoverGui:
             display_name=self.train_name.get(),
             config=cfg,
             consent=True,
-            log=lambda message: self.log_queue.put(f"[training] {message}"),
+            log=lambda message: self._log_with_scope("training", message),
         )
 
     def _dedicated_output_dir(self, requested: Path) -> Path:
@@ -182,7 +190,7 @@ class AudioCoverGui:
             out_dir,
             config=cfg,
             consent=True,
-            log=lambda message: self.log_queue.put(f"[render] {message}"),
+            log=lambda message: self._log_with_scope("render", message),
         )
 
     def _poll_logs(self) -> None:
@@ -191,7 +199,17 @@ class AudioCoverGui:
                 msg = self.log_queue.get_nowait()
             except queue.Empty:
                 break
-            self.logs.insert("end", msg + "\n")
+            if msg.startswith("\r"):
+                text = msg[1:]
+                if self._last_log_was_progress:
+                    self.logs.delete("end-2l linestart", "end-2l lineend")
+                    self.logs.insert("end-2l linestart", text)
+                else:
+                    self.logs.insert("end", text + "\n")
+                self._last_log_was_progress = True
+            else:
+                self.logs.insert("end", msg + "\n")
+                self._last_log_was_progress = False
             self.logs.see("end")
         self.root.after(200, self._poll_logs)
 

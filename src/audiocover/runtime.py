@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import queue
+import re
 import subprocess
 import sys
 import threading
@@ -18,6 +19,17 @@ from .process import popen_hidden
 
 class BackendRuntimeError(RuntimeError):
     pass
+
+
+_JSON_DECODER = json.JSONDecoder()
+_PROGRESS_RE = re.compile(
+    r"(?P<percent>\d{1,3})%\|[^|]*\|\s*(?P<current>\d+)/(?:\s*)?(?P<total>\d+)\s*"
+    r"\[(?P<elapsed>[^<\]]+)(?:<(?P<remaining>[^,\]]+))?(?:,\s*(?P<rate>[^\]]+))?\]"
+)
+_NOISY_BACKEND_LOG_MARKERS = (
+    "F0 inference time",
+    "HuBERT inference time",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,30 +63,65 @@ CONVERSION_ORDER = ("rvc", "so-vits-svc", "simple-timbre")
 SEPARATOR_ORDER = ("demucs-separator",)
 
 
+def _response_from_text(text: str, request_id: str) -> dict[str, Any] | None:
+    for index, char in enumerate(text):
+        if char != "{":
+            continue
+        try:
+            data, _ = _JSON_DECODER.raw_decode(text[index:])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(data, dict) and data.get("id") == request_id and "ok" in data:
+            return data
+    return None
+
+
 def _is_response_line(line: str, request_id: str) -> bool:
-    if not line.startswith("{"):
-        return False
-    try:
-        data = json.loads(line)
-    except json.JSONDecodeError:
-        return False
-    return isinstance(data, dict) and data.get("id") == request_id and "ok" in data
+    return _response_from_text(line, request_id) is not None
+
+
+def _progress_summary(line: str) -> str | None:
+    match = _PROGRESS_RE.search(line)
+    if not match:
+        return None
+    percent = max(0, min(100, int(match.group("percent"))))
+    current = int(match.group("current"))
+    total = int(match.group("total"))
+    remaining = match.group("remaining") or ""
+    rate = (match.group("rate") or "").strip()
+    suffix_items = [item for item in (f"remaining {remaining}" if remaining else "", rate) if item]
+    suffix = f" ({', '.join(suffix_items)})" if suffix_items else ""
+    return f"{percent}% ({current}/{total}){suffix}"
+
+
+def _should_suppress_backend_log(line: str) -> bool:
+    return any(marker in line for marker in _NOISY_BACKEND_LOG_MARKERS)
+
+
+def _prepare_env() -> dict[str, str]:
+    env = os.environ.copy()
+    env.setdefault("PYTHONUNBUFFERED", "1")
+    env.setdefault("PYTHONUTF8", "1")
+    env.setdefault("PYTHONIOENCODING", "utf-8:replace")
+    env.setdefault("NO_COLOR", "1")
+    env.setdefault("RICH_FORCE_TERMINAL", "0")
+    if not sys.platform.startswith("win"):
+        env.setdefault("LC_ALL", "C.UTF-8")
+        env.setdefault("LANG", "C.UTF-8")
+    return env
 
 
 def _find_worker_response(stdout_lines: list[str], request_id: str) -> dict[str, Any]:
     parse_errors: list[str] = []
     for line in reversed([item for item in stdout_lines if item]):
-        if not line.startswith("{"):
-            continue
-        try:
-            response = json.loads(line)
-        except json.JSONDecodeError as exc:
-            parse_errors.append(str(exc))
-            continue
-        if not isinstance(response, dict):
-            continue
-        if response.get("id") == request_id and "ok" in response:
+        response = _response_from_text(line, request_id)
+        if response is not None:
             return response
+        if "{" in line:
+            try:
+                json.loads(line)
+            except json.JSONDecodeError as exc:
+                parse_errors.append(str(exc))
     tail = "\n".join(stdout_lines)[-4000:]
     details = f"; parse errors: {parse_errors[-3:]}" if parse_errors else ""
     raise BackendRuntimeError(f"worker did not return a valid JSON response{details}: {tail}")
@@ -174,8 +221,7 @@ class BackendRuntimeManager:
         if log:
             log(f"starting {worker_name} runtime action: {action}")
 
-        env = os.environ.copy()
-        env.setdefault("PYTHONUNBUFFERED", "1")
+        env = _prepare_env()
         process = popen_hidden(
             list(runtime.command),
             stdin=subprocess.PIPE,
@@ -188,6 +234,21 @@ class BackendRuntimeManager:
         stdout_lines: list[str] = []
         stderr_lines: list[str] = []
         events: queue.Queue[tuple[str, str]] = queue.Queue()
+        last_progress: dict[str, str] = {}
+
+        def log_worker_line(stream_name: str, line: str) -> None:
+            if log is None or not line or _is_response_line(line, request["id"]):
+                return
+            progress = _progress_summary(line)
+            if progress:
+                if last_progress.get("value") != progress:
+                    last_progress["value"] = progress
+                    log(f"\r{worker_name} progress: {progress}")
+                return
+            if _should_suppress_backend_log(line):
+                return
+            prefix = "stderr" if stream_name == "stderr" else "stdout"
+            log(f"{worker_name} {prefix}: {line}")
 
         def read_stream(stream_name: str, lines: list[str], stream) -> None:
             assert stream is not None
@@ -215,18 +276,14 @@ class BackendRuntimeManager:
                 stream_name, line = events.get(timeout=0.1)
             except queue.Empty:
                 continue
-            if log and line and not _is_response_line(line, request["id"]):
-                prefix = "stderr" if stream_name == "stderr" else "stdout"
-                log(f"{worker_name} {prefix}: {line}")
+            log_worker_line(stream_name, line)
 
         for thread in threads:
             thread.join(timeout=0.2)
 
         while not events.empty():
             stream_name, line = events.get_nowait()
-            if log and line and not _is_response_line(line, request["id"]):
-                prefix = "stderr" if stream_name == "stderr" else "stdout"
-                log(f"{worker_name} {prefix}: {line}")
+            log_worker_line(stream_name, line)
 
         return_code = process.returncode
         if return_code != 0:

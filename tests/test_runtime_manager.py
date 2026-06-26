@@ -194,6 +194,30 @@ def test_runtime_manager_coalesces_tqdm_progress_lines(tmp_path: Path) -> None:
     assert any(line.startswith("\rsimple-timbre progress: 91% (173/191)") for line in logs)
     assert not any("████" in line for line in logs)
 
+
+def test_runtime_manager_handles_carriage_return_progress_without_newlines(tmp_path: Path) -> None:
+    runtime_root = tmp_path / "backend-runtimes"
+    _write_fake_runtime(
+        runtime_root,
+        "import json, sys\n"
+        "req=json.loads(sys.stdin.read())\n"
+        "sys.stderr.write('  0%|          | 0/191 [00:00<?, ?it/s]')\n"
+        "sys.stderr.flush()\n"
+        "sys.stderr.write('\\r 50%|█████     | 95/191 [01:00<01:00,  1.50it/s]')\n"
+        "sys.stderr.flush()\n"
+        "sys.stderr.write('\\r100%|██████████| 191/191 [02:00<00:00,  1.59it/s]')\n"
+        "sys.stderr.flush()\n"
+        "print(json.dumps({'id': req['id'], 'ok': True, 'result': {'value': 13}}), flush=True)\n",
+    )
+
+    logs: list[str] = []
+    manager = BackendRuntimeManager(runtime_roots=[runtime_root])
+
+    assert manager.invoke("simple-timbre", "train", {}, log=logs.append) == {"value": 13}
+    assert any(line.startswith("\rsimple-timbre progress: 0% (0/191)") for line in logs)
+    assert any(line.startswith("\rsimple-timbre progress: 50% (95/191)") for line in logs)
+    assert any(line.startswith("\rsimple-timbre progress: 100% (191/191)") for line in logs)
+
 def test_runtime_manager_reports_missing_worker_response(tmp_path: Path) -> None:
     runtime_root = tmp_path / "backend-runtimes"
     _write_fake_runtime(

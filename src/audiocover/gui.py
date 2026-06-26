@@ -44,7 +44,6 @@ class AudioCoverGui:
         self.root.title("AudioCover")
         self.root.geometry("920x720")
         self.log_queue: queue.Queue[str] = queue.Queue()
-        self._last_log_was_progress = False
         self.worker = Worker(self.log_queue)
 
         notebook = ttk.Notebook(self.root)
@@ -200,16 +199,8 @@ class AudioCoverGui:
             except queue.Empty:
                 break
             if msg.startswith("\r"):
-                text = msg[1:]
-                if self._last_log_was_progress:
-                    self.logs.delete("end-2l linestart", "end-2l lineend")
-                    self.logs.insert("end-2l linestart", text)
-                else:
-                    self.logs.insert("end", text + "\n")
-                self._last_log_was_progress = True
-            else:
-                self.logs.insert("end", msg + "\n")
-                self._last_log_was_progress = False
+                msg = msg[1:]
+            self.logs.insert("end", msg + "\n")
             self.logs.see("end")
         self.root.after(200, self._poll_logs)
 

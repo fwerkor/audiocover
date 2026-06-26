@@ -223,6 +223,7 @@ def test_so_vits_worker_availability_runs_decoder_self_test(monkeypatch) -> None
     from audiocover.workers import so_vits_svc_worker
 
     monkeypatch.setattr(so_vits_svc_worker, "_check_required_dependencies", lambda: None)
+    monkeypatch.setattr(so_vits_svc_worker, "_hubert_import_self_test", lambda: None)
     monkeypatch.setattr(
         so_vits_svc_worker,
         "_torchaudio_decode_self_test",
@@ -234,3 +235,21 @@ def test_so_vits_worker_availability_runs_decoder_self_test(monkeypatch) -> None
     assert not available
     assert reason is not None
     assert "decoder self-test failed" in reason
+
+
+def test_so_vits_worker_availability_runs_hubert_self_test(monkeypatch) -> None:
+    from audiocover.workers import so_vits_svc_worker
+
+    monkeypatch.setattr(so_vits_svc_worker, "_check_required_dependencies", lambda: None)
+    monkeypatch.setattr(
+        so_vits_svc_worker,
+        "_hubert_import_self_test",
+        lambda: "transformers HuBERT import self-test failed: probe",
+    )
+    monkeypatch.setattr(so_vits_svc_worker, "_torchaudio_decode_self_test", lambda: None)
+
+    available, reason = so_vits_svc_worker._available()
+
+    assert not available
+    assert reason is not None
+    assert "HuBERT import self-test failed" in reason

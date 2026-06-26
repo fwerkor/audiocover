@@ -148,6 +148,29 @@ def _check_required_dependencies() -> str | None:
     return None
 
 
+def _hubert_import_self_test() -> str | None:
+    try:
+        from transformers import HubertModel
+    except Exception as exc:
+        return f"transformers HuBERT import self-test failed: {type(exc).__name__}: {exc}"
+    if HubertModel is None:
+        return "transformers HuBERT import self-test failed: HubertModel is unavailable"
+    return None
+
+
+def _asset_self_test() -> str | None:
+    if _runtime_downloads_allowed():
+        return None
+    missing: list[str] = []
+    if _contentvec_dir() is None:
+        missing.append("content-vec-best/config.json and pytorch_model.bin")
+    if _asset_dir("so-vits-svc-init", ("D_0.pth", "G_0.pth")) is None:
+        missing.append("so-vits-svc-init/D_0.pth and G_0.pth")
+    if missing:
+        return "missing bundled So-VITS-SVC runtime assets: " + "; ".join(missing)
+    return None
+
+
 def _write_probe_wav(path: Path, *, sample_rate: int = 16000) -> None:
     frame_count = sample_rate // 20
     with wave.open(str(path), "wb") as handle:
@@ -214,9 +237,15 @@ def _available() -> tuple[bool, str | None]:
     dependency_error = _check_required_dependencies()
     if dependency_error:
         return False, dependency_error
+    hubert_error = _hubert_import_self_test()
+    if hubert_error:
+        return False, hubert_error
     decode_error = _torchaudio_decode_self_test()
     if decode_error:
         return False, decode_error
+    asset_error = _asset_self_test()
+    if asset_error:
+        return False, asset_error
     return True, None
 
 
@@ -234,7 +263,15 @@ def self_test(_: dict[str, Any]) -> dict[str, Any]:
     available, reason = _available()
     if not available:
         raise RuntimeError(reason)
-    return {"checks": ["required imports", "torchaudio WAV decoder"], "ok": True}
+    return {
+        "checks": [
+            "required imports",
+            "transformers HuBERT import",
+            "torchaudio WAV decoder",
+            "bundled assets",
+        ],
+        "ok": True,
+    }
 
 
 def train(payload: dict[str, Any]) -> dict[str, Any]:

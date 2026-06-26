@@ -51,3 +51,12 @@ def test_build_script_self_tests_so_vits_runtime_without_torchcodec() -> None:
 
     assert "torchcodec" not in build_desktop.WORKER_COLLECTS["so-vits-svc"]
     assert build_desktop.RUNTIME_SELF_TESTS["so-vits-svc"] == "self_test"
+
+
+def test_so_vits_runtime_pack_includes_hubert_import_chain() -> None:
+    build_desktop = _build_desktop_module()
+
+    hidden_imports = build_desktop.WORKER_HIDDEN_IMPORTS["so-vits-svc"]
+    assert "transformers.models.hubert.modeling_hubert" in hidden_imports
+    assert "torch._inductor.test_operators" in hidden_imports
+    assert "torch._inductor" not in build_desktop.WORKER_EXCLUDES

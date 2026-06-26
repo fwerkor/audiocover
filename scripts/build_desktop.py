@@ -43,6 +43,12 @@ WORKER_COLLECTS = {
     "so-vits-svc": ("so_vits_svc_fork", "librosa", "sklearn"),
     "demucs-separator": ("demucs",),
 }
+WORKER_HIDDEN_IMPORTS = {
+    "so-vits-svc": (
+        "transformers.models.hubert.modeling_hubert",
+        "torch._inductor.test_operators",
+    ),
+}
 RUNTIME_SELF_TESTS = {
     "so-vits-svc": "self_test",
 }
@@ -76,7 +82,6 @@ WORKER_EXCLUDES = (
     "pycparser.lextab",
     "pycparser.yacctab",
     "scipy.special._cdflib",
-    "torch._inductor",
     "torch.distributed._shard.checkpoint",
     "torch.distributed._sharded_tensor",
     "torch.distributed._sharding_spec",
@@ -241,6 +246,8 @@ def build_workers(worker_names: tuple[str, ...], *, clean: bool, runtime_dir: Pa
         ]
         for collected in WORKER_COLLECTS.get(worker_name, ()):  # backend packages can have dynamic imports
             command.extend(["--collect-all", collected])
+        for hidden_import in WORKER_HIDDEN_IMPORTS.get(worker_name, ()):  # transformers/torch lazy imports
+            command.extend(["--hidden-import", hidden_import])
         for excluded in WORKER_EXCLUDES:
             command.extend(["--exclude-module", excluded])
         command.append(str(ROOT / "src" / "audiocover" / "workers" / f"{module.rsplit('.', 1)[-1]}.py"))

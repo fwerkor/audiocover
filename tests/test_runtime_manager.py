@@ -125,6 +125,14 @@ def test_so_vits_worker_prefers_env_contentvec_asset_dir(tmp_path: Path, monkeyp
     assert so_vits_svc_worker._contentvec_dir() == asset_dir
 
 
+def test_so_vits_worker_asset_dir_handles_shallow_frozen_file_path(monkeypatch) -> None:
+    from audiocover.workers import so_vits_svc_worker
+
+    monkeypatch.setattr(so_vits_svc_worker, "__file__", "/tmp/worker.py")
+
+    assert so_vits_svc_worker._asset_dir("missing-assets", ("model.bin",)) is None
+
+
 def test_so_vits_worker_copies_bundled_init_checkpoints(tmp_path: Path, monkeypatch) -> None:
     from audiocover.workers import so_vits_svc_worker
 

@@ -45,7 +45,9 @@ def _asset_dir(name: str, required_files: tuple[str, ...]) -> Path | None:
         candidates.append(Path(meipass) / "assets" / name)
 
     source_path = Path(__file__).resolve()
-    candidates.extend((source_path.parent / "assets" / name, source_path.parents[3] / "backend-runtimes" / "so-vits-svc" / "assets" / name))
+    candidates.append(source_path.parent / "assets" / name)
+    if len(source_path.parents) > 3:
+        candidates.append(source_path.parents[3] / "backend-runtimes" / "so-vits-svc" / "assets" / name)
 
     seen: set[Path] = set()
     for candidate in candidates:

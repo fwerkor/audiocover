@@ -72,6 +72,16 @@ WORKER_EXCLUDES = (
     "pandas",
     "pyarrow",
     "pytest",
+    # Optional modules that PyInstaller hooks probe even though AudioCover workers do not use them.
+    "pycparser.lextab",
+    "pycparser.yacctab",
+    "scipy.special._cdflib",
+    "torch._inductor",
+    "torch.distributed._shard.checkpoint",
+    "torch.distributed._sharded_tensor",
+    "torch.distributed._sharding_spec",
+    "torch.utils.tensorboard",
+    "triton",
 )
 
 
@@ -213,6 +223,8 @@ def build_workers(worker_names: tuple[str, ...], *, clean: bool, runtime_dir: Pa
         shutil.rmtree(worker_build, ignore_errors=True)
         command = [
             "pyinstaller",
+            "--log-level",
+            "ERROR",
             "--clean",
             "--noconfirm",
             "--onefile",
@@ -290,7 +302,7 @@ def build_bundle(clean: bool) -> None:
     if clean:
         shutil.rmtree(DIST_DIR, ignore_errors=True)
         shutil.rmtree(BUILD_DIR / "audiocover-gui", ignore_errors=True)
-    _run(["pyinstaller", str(SPEC_PATH), "--clean", "--noconfirm"])
+    _run(["pyinstaller", "--log-level", "ERROR", str(SPEC_PATH), "--clean", "--noconfirm"])
     if not (APP_DIR.exists() or MAC_APP_DIR.exists()):
         raise FileNotFoundError(f"PyInstaller did not create {APP_DIR} or {MAC_APP_DIR}")
 

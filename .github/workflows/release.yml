@@ -25,8 +25,8 @@ jobs:
   build-python:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
       - run: python -m pip install -U pip build
@@ -52,8 +52,8 @@ jobs:
           - name: macos-arm64
             os: macos-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
       - name: Install platform packages on Ubuntu
@@ -64,7 +64,9 @@ jobs:
         run: choco install ffmpeg -y
       - name: Install FFmpeg on macOS
         if: runner.os == 'macOS'
-        run: brew install ffmpeg
+        run: |
+          brew untap aws/tap || true
+          brew install ffmpeg
       - name: Install desktop build dependencies
         run: python -m pip install -U pip && python -m pip install -e ".[build]"
       - name: Build desktop bundle
@@ -139,8 +141,8 @@ jobs:
             name: linux-x64
             os: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python }}
       - name: Install platform packages on Ubuntu
@@ -151,7 +153,9 @@ jobs:
         run: choco install ffmpeg -y
       - name: Install FFmpeg on macOS
         if: runner.os == 'macOS'
-        run: brew install ffmpeg
+        run: |
+          brew untap aws/tap || true
+          brew install ffmpeg
       - name: Install runtime build dependencies
         run: python -m pip install -U ${{ matrix.pip }} pyinstaller build && python -m pip install ${{ matrix.packages }}
       - name: Build runtime pack

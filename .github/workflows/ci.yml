@@ -12,8 +12,8 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
         python-version: ['3.10', '3.11', '3.12']
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install FFmpeg on Ubuntu
@@ -24,7 +24,9 @@ jobs:
         run: choco install ffmpeg -y
       - name: Install FFmpeg on macOS
         if: runner.os == 'macOS'
-        run: brew install ffmpeg
+        run: |
+          brew untap aws/tap || true
+          brew install ffmpeg
       - name: Install package
         run: python -m pip install -U pip && python -m pip install -e ".[dev]"
       - name: Lint
@@ -37,8 +39,8 @@ jobs:
   desktop-runtime:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
       - name: Install platform packages
@@ -51,8 +53,8 @@ jobs:
   separator-runtime:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
       - name: Install platform packages

@@ -157,7 +157,12 @@ jobs:
           brew untap aws/tap || true
           brew install ffmpeg
       - name: Install runtime build dependencies
-        run: python -m pip install -U ${{ matrix.pip }} pyinstaller build && python -m pip install ${{ matrix.packages }}
+        run: python -m pip install -U ${{ matrix.pip }} pyinstaller build
+      - name: Install CUDA PyTorch for Windows So-VITS-SVC
+        if: matrix.backend == 'so-vits-svc' && matrix.name == 'windows-x64'
+        run: python -m pip install --index-url https://download.pytorch.org/whl/cu121 "torch==2.5.1+cu121" "torchaudio==2.5.1+cu121"
+      - name: Install runtime Python packages
+        run: python -m pip install ${{ matrix.packages }}
       - name: Build runtime pack
         run: python scripts/build_desktop.py --runtime-pack ${{ matrix.backend }}
       - uses: actions/upload-artifact@v4

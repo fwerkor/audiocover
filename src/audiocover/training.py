@@ -142,6 +142,7 @@ def train_model(
                 "epochs": config.epochs,
                 "batch_size": config.batch_size,
                 "f0_method": config.f0_method,
+                "device": config.device,
             },
             log=log,
         )

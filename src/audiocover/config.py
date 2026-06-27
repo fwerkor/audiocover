@@ -42,6 +42,7 @@ class ConversionConfig(BaseModel):
 class TrainingConfig(BaseModel):
     backend: Literal["auto", "managed", "simple-timbre", "external"] = "auto"
     runtime_backend: str | None = None
+    device: str = "auto"
     sample_rate: int = 48000
     segment_seconds: float = Field(default=12.0, ge=2.0, le=30.0)
     epochs: int = Field(default=200, ge=1)

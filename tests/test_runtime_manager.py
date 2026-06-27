@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import soundfile as sf
@@ -380,3 +382,85 @@ def test_so_vits_worker_availability_runs_training_entrypoint_self_test(monkeypa
     assert not available
     assert reason is not None
     assert "training entrypoint self-test failed" in reason
+
+
+class _FakeTensor:
+    def __iadd__(self, _value):
+        return self
+
+
+class _FakeTorchDevice:
+    def __init__(self, value: str):
+        self.value = value
+        self.type = value.split(":", 1)[0]
+        self.index = int(value.split(":", 1)[1]) if ":" in value else None
+
+    def __str__(self) -> str:
+        return self.value
+
+
+def test_so_vits_worker_cuda_first_device_falls_back_to_cpu_without_cuda_build(monkeypatch) -> None:
+    from audiocover.workers import so_vits_svc_worker
+
+    fake_torch = SimpleNamespace(
+        version=SimpleNamespace(cuda=None),
+        cuda=SimpleNamespace(
+            is_available=lambda: True,
+            device_count=lambda: 1,
+            synchronize=lambda _device=None: None,
+        ),
+        device=_FakeTorchDevice,
+        empty=lambda _shape, device=None: _FakeTensor(),
+    )
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+
+    device, reason = so_vits_svc_worker._resolve_torch_device("auto")
+
+    assert device == "cpu"
+    assert reason is not None
+    assert "CUDA PyTorch build is not installed" in reason
+
+
+def test_so_vits_worker_cuda_first_device_uses_cuda_when_probe_succeeds(monkeypatch) -> None:
+    from audiocover.workers import so_vits_svc_worker
+
+    fake_torch = SimpleNamespace(
+        version=SimpleNamespace(cuda="12.1"),
+        cuda=SimpleNamespace(
+            is_available=lambda: True,
+            device_count=lambda: 1,
+            get_device_name=lambda _index: "Fake CUDA GPU",
+            synchronize=lambda _device=None: None,
+        ),
+        device=_FakeTorchDevice,
+        empty=lambda _shape, device=None: _FakeTensor(),
+    )
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+
+    device, reason = so_vits_svc_worker._resolve_torch_device("auto")
+
+    assert device == "cuda"
+    assert reason is None
+
+
+def test_so_vits_worker_patches_numpy_binary_plotting(monkeypatch) -> None:
+    import numpy as np
+    import pytest
+
+    pytest.importorskip("matplotlib")
+    from audiocover.workers import so_vits_svc_worker
+
+    svc_utils = SimpleNamespace(
+        plot_spectrogram_to_numpy=lambda _spectrogram: None,
+        plot_data_to_numpy=lambda _x, _y: None,
+    )
+    monkeypatch.setitem(sys.modules, "so_vits_svc_fork", SimpleNamespace(utils=svc_utils))
+    monkeypatch.setitem(sys.modules, "so_vits_svc_fork.utils", svc_utils)
+
+    so_vits_svc_worker._patch_so_vits_numpy_plotting()
+
+    spectrogram = svc_utils.plot_spectrogram_to_numpy(np.zeros((2, 3), dtype=np.float32))
+    line_plot = svc_utils.plot_data_to_numpy(np.zeros(3, dtype=np.float32), np.ones(3, dtype=np.float32))
+
+    assert spectrogram.shape[-1] == 4
+    assert line_plot.shape[-1] == 4

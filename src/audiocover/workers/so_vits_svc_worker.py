@@ -202,6 +202,220 @@ def _patch_so_vits_pretrained_model_lookup(model_dir: Path) -> None:
     _install_pretrained_model_compat(model_dir, svc_utils, svc_train_module)
 
 
+def _format_torch_device_report() -> str:
+    try:
+        import torch
+    except Exception as exc:
+        return f"torch import failed: {type(exc).__name__}: {exc}"
+
+    parts = [f"torch={getattr(torch, '__version__', 'unknown')}"]
+    version = getattr(torch, "version", None)
+    parts.append(f"cuda_build={getattr(version, 'cuda', None) or 'none'}")
+    try:
+        available = torch.cuda.is_available()
+    except Exception as exc:
+        return "; ".join(parts + [f"cuda_available_check_failed={type(exc).__name__}: {exc}"])
+    parts.append(f"cuda_available={available}")
+    if available:
+        try:
+            count = torch.cuda.device_count()
+            names = [torch.cuda.get_device_name(index) for index in range(count)]
+            parts.append(f"cuda_devices={count} ({', '.join(names)})")
+        except Exception as exc:
+            parts.append(f"cuda_device_query_failed={type(exc).__name__}: {exc}")
+    return "; ".join(parts)
+
+
+def _resolve_torch_device(preferred: str | None) -> tuple[str, str | None]:
+    requested = (preferred or "auto").strip().lower()
+    if requested in {"", "auto"}:
+        candidates = ["cuda", "cpu"]
+    elif requested in {"gpu", "cuda"} or requested.startswith("cuda:"):
+        candidates = [requested if requested.startswith("cuda:") else "cuda", "cpu"]
+    else:
+        candidates = [requested, "cpu"] if requested != "cpu" else ["cpu"]
+
+    try:
+        import torch
+    except Exception as exc:
+        return "cpu", f"torch import failed: {type(exc).__name__}: {exc}"
+
+    failures: list[str] = []
+    for candidate in candidates:
+        if candidate.startswith("cuda"):
+            cuda_build = getattr(getattr(torch, "version", None), "cuda", None)
+            if not cuda_build:
+                failures.append("CUDA PyTorch build is not installed")
+                continue
+            try:
+                if not torch.cuda.is_available():
+                    failures.append("torch.cuda.is_available() is false")
+                    continue
+                if torch.cuda.device_count() <= 0:
+                    failures.append("torch.cuda.device_count() is 0")
+                    continue
+                device = torch.device(candidate)
+                probe = torch.empty((1,), device=device)
+                probe += 1
+                torch.cuda.synchronize(device)
+                return str(device), None
+            except Exception as exc:
+                failures.append(f"{candidate} initialization failed: {type(exc).__name__}: {exc}")
+                continue
+        if candidate == "cpu":
+            return "cpu", "; ".join(failures) if failures else None
+        try:
+            device = torch.device(candidate)
+            _ = torch.empty((1,), device=device)
+            return str(device), None
+        except Exception as exc:
+            failures.append(f"{candidate} initialization failed: {type(exc).__name__}: {exc}")
+    return "cpu", "; ".join(failures) if failures else "no usable training device found"
+
+
+def _patch_so_vits_device_selection(device: str) -> None:
+    import torch
+    from so_vits_svc_fork import utils as svc_utils
+
+    selected = torch.device(device)
+
+    def get_selected_device(index: int = 0) -> torch.device:
+        if selected.type == "cuda" and selected.index is None and torch.cuda.device_count() > 0:
+            return torch.device(f"cuda:{index % torch.cuda.device_count()}")
+        return selected
+
+    svc_utils.get_optimal_device = get_selected_device
+
+
+def _install_lightning_trainer_device_defaults(device: str):
+    import lightning.pytorch as pl
+
+    original = getattr(pl.Trainer, "_audiocover_original", pl.Trainer)
+
+    class AudioCoverProgressCallback(pl.Callback):
+        _audiocover_progress = True
+
+        def on_train_epoch_start(self, trainer, pl_module) -> None:
+            total = getattr(trainer, "max_epochs", None)
+            current = int(getattr(trainer, "current_epoch", 0)) + 1
+            if isinstance(total, int) and total > 0:
+                print(f"so-vits-svc: training epoch {current}/{total} started", flush=True)
+            else:
+                print(f"so-vits-svc: training epoch {current} started", flush=True)
+
+        def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx: int) -> None:
+            total = getattr(trainer, "num_training_batches", None)
+            if not isinstance(total, int) or total <= 0:
+                return
+            interval = max(1, total // 10)
+            current = batch_idx + 1
+            if current != total and current % interval != 0:
+                return
+            epoch = int(getattr(trainer, "current_epoch", 0)) + 1
+            max_epochs = getattr(trainer, "max_epochs", None)
+            prefix = f"so-vits-svc: epoch {epoch}/{max_epochs}" if isinstance(max_epochs, int) else f"so-vits-svc: epoch {epoch}"
+            metrics = []
+            for key, value in sorted(getattr(trainer, "progress_bar_metrics", {}).items()):
+                try:
+                    number = float(value.detach().cpu()) if hasattr(value, "detach") else float(value)
+                except Exception:
+                    continue
+                metrics.append(f"{key}={number:.4g}")
+                if len(metrics) >= 4:
+                    break
+            suffix = f"; {', '.join(metrics)}" if metrics else ""
+            print(f"{prefix} batch {current}/{total}{suffix}", flush=True)
+
+        def on_train_epoch_end(self, trainer, pl_module) -> None:
+            epoch = int(getattr(trainer, "current_epoch", 0)) + 1
+            print(f"so-vits-svc: training epoch {epoch} finished", flush=True)
+
+    def trainer_with_device_defaults(*args, **kwargs):
+        if device.startswith("cuda"):
+            kwargs.setdefault("accelerator", "gpu")
+            if ":" in device:
+                kwargs.setdefault("devices", [int(device.rsplit(":", 1)[1])])
+            else:
+                kwargs.setdefault("devices", 1)
+        elif device == "cpu":
+            kwargs.setdefault("accelerator", "cpu")
+            kwargs.setdefault("devices", 1)
+        elif device == "mps":
+            kwargs.setdefault("accelerator", "mps")
+            kwargs.setdefault("devices", 1)
+        callbacks = list(kwargs.get("callbacks") or [])
+        callbacks = [callback for callback in callbacks if callback.__class__.__name__ != "RichProgressBar"]
+        if not any(getattr(callback, "_audiocover_progress", False) for callback in callbacks):
+            callbacks.append(AudioCoverProgressCallback())
+        kwargs["callbacks"] = callbacks
+        return original(*args, **kwargs)
+
+    trainer_with_device_defaults._audiocover_original = original  # type: ignore[attr-defined]
+    pl.Trainer = trainer_with_device_defaults
+    return original
+
+
+def _restore_lightning_trainer(original) -> None:
+    if original is None:
+        return
+    try:
+        import lightning.pytorch as pl
+    except Exception:
+        return
+    pl.Trainer = original
+
+
+def _patch_so_vits_numpy_plotting() -> None:
+    from so_vits_svc_fork import utils as svc_utils
+
+    if getattr(svc_utils.plot_spectrogram_to_numpy, "_audiocover_patch", False):
+        return
+
+    def _canvas_argb_to_numpy(fig):
+        import numpy as np
+
+        fig.canvas.draw()
+        data = np.frombuffer(fig.canvas.tostring_argb(), dtype=np.uint8)
+        return data.reshape(fig.canvas.get_width_height()[::-1] + (4,))
+
+    def plot_spectrogram_to_numpy(spectrogram):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pylab as plt
+
+        fig, ax = plt.subplots(figsize=(10, 2))
+        try:
+            im = ax.imshow(spectrogram, aspect="auto", origin="lower", interpolation="none")
+            plt.colorbar(im, ax=ax)
+            plt.xlabel("Frames")
+            plt.ylabel("Channels")
+            plt.tight_layout()
+            return _canvas_argb_to_numpy(fig)
+        finally:
+            plt.close(fig)
+
+    def plot_data_to_numpy(x, y):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pylab as plt
+
+        fig, _ax = plt.subplots(figsize=(10, 2))
+        try:
+            plt.plot(x)
+            plt.plot(y)
+            plt.tight_layout()
+            return _canvas_argb_to_numpy(fig)
+        finally:
+            plt.close(fig)
+
+    plot_spectrogram_to_numpy._audiocover_patch = True  # type: ignore[attr-defined]
+    plot_data_to_numpy._audiocover_patch = True  # type: ignore[attr-defined]
+    svc_utils.plot_spectrogram_to_numpy = plot_spectrogram_to_numpy
+    svc_utils.plot_data_to_numpy = plot_data_to_numpy
+
+
 def _check_required_dependencies() -> str | None:
     failures: list[str] = []
     for module_name, package_name in _REQUIRED_IMPORTS:
@@ -387,6 +601,13 @@ def train(payload: dict[str, Any]) -> dict[str, Any]:
 
     _patch_contentvec_loader()
     _patch_torchaudio_wav_loader()
+    _patch_so_vits_numpy_plotting()
+    print(f"so-vits-svc: {_format_torch_device_report()}", flush=True)
+    training_device, fallback_reason = _resolve_torch_device(str(payload.get("device") or "auto"))
+    if fallback_reason and training_device == "cpu":
+        print(f"so-vits-svc: CUDA unavailable for training ({fallback_reason}); falling back to CPU", flush=True)
+    print(f"so-vits-svc: selected training device: {training_device}", flush=True)
+    _patch_so_vits_device_selection(training_device)
 
     dataset_wavs = Path(payload["dataset_wavs"])
     output_dir = Path(payload["output_dir"])
@@ -444,12 +665,16 @@ def train(payload: dict[str, Any]) -> dict[str, Any]:
     _patch_so_vits_pretrained_model_lookup(model_dir)
     _patch_lightning_rich_summary()
     logging.getLogger("lightning.pytorch.utilities.rank_zero").disabled = True
-    svc_train.callback(
-        config_path=config_path,
-        model_path=model_dir,
-        tensorboard=False,
-        reset_optimizer=False,
-    )
+    original_trainer = _install_lightning_trainer_device_defaults(training_device)
+    try:
+        svc_train.callback(
+            config_path=config_path,
+            model_path=model_dir,
+            tensorboard=False,
+            reset_optimizer=False,
+        )
+    finally:
+        _restore_lightning_trainer(original_trainer)
     print("so-vits-svc: locating trained checkpoint", flush=True)
     candidates = sorted(model_dir.glob("G_*.pth"), key=lambda path: path.stat().st_mtime)
     if not candidates:

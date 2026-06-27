@@ -66,6 +66,20 @@ for package in (
     binaries += package_binaries
     hiddenimports += package_hidden
 
+# PyInstaller's Torch hook can emit ERROR lines for distributed checkpoint modules
+# that are not present in CPU-only wheels. AudioCover does not use distributed
+# checkpointing; filter those collected hidden imports before Analysis runs.
+_FILTERED_HIDDEN_IMPORT_PREFIXES = (
+    'torch.distributed._shard.checkpoint',
+    'torch.distributed._sharded_tensor',
+    'torch.distributed._sharding_spec',
+)
+hiddenimports = sorted({
+    item
+    for item in hiddenimports
+    if not item.startswith(_FILTERED_HIDDEN_IMPORT_PREFIXES)
+})
+
 for package in ('soundfile', 'numpy', 'scipy'):
     try:
         datas += collect_data_files(package)

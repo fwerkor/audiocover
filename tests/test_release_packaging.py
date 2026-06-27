@@ -51,6 +51,17 @@ def test_release_builds_cpu_only_single_file_desktop_artifacts() -> None:
     assert "torchaudio==2.11.0+cu130" not in workflow
 
 
+
+def test_release_workflow_uses_current_artifact_and_release_actions() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+
+    assert "actions/upload-artifact@v7" in workflow
+    assert "actions/download-artifact@v8" in workflow
+    assert "softprops/action-gh-release@v3" in workflow
+    assert "actions/upload-artifact@v4" not in workflow
+    assert "actions/download-artifact@v4" not in workflow
+    assert "softprops/action-gh-release@v2" not in workflow
+
 def test_pyinstaller_spec_is_onefile_and_embeds_workers_and_assets() -> None:
     spec = (ROOT / "packaging" / "audiocover-gui.spec").read_text(encoding="utf-8")
 
@@ -59,6 +70,8 @@ def test_pyinstaller_spec_is_onefile_and_embeds_workers_and_assets() -> None:
     assert "BUNDLE_ASSETS_DIR" in spec
     assert "backend-runtimes" not in spec
     assert "COLLECT(" not in spec
+    assert "_FILTERED_HIDDEN_IMPORT_PREFIXES" in spec
+    assert "torch.distributed._shard.checkpoint" in spec
     for module in (
         "audiocover.workers.simple_timbre_worker",
         "audiocover.workers.demucs_separator_worker",

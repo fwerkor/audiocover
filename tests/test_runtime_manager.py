@@ -107,7 +107,7 @@ def test_runtime_manager_streams_worker_logs(tmp_path: Path) -> None:
 def test_preferred_runtime_must_be_available() -> None:
     manager = BackendRuntimeManager(runtime_roots=[])
     try:
-        manager.require_training_backend("rvc")
+        manager.require_training_backend("missing-backend")
     except BackendRuntimeError as exc:
         assert "preferred backend runtime is not available" in str(exc)
     else:

@@ -20,11 +20,11 @@ A model package is a directory containing `model.yaml`. For built-in training it
 
 ### simple-timbre
 
-A CI-testable fallback backend. It learns a spectral target profile from the supplied data and applies that profile to an input vocal stem. It is not intended to match a serious RVC/SVC model, but it verifies the complete product path.
+A CI-testable fallback backend. It learns a spectral target profile from the supplied data and applies that profile to an input vocal stem. It is not intended to match a serious SVC model, but it verifies the complete product path.
 
 ### external
 
-Runs user-configured commands. This is the intended production path for RVC, Seed-VC, So-VITS-SVC, or future SVC engines.
+Runs user-configured commands. This is the intended production path for So-VITS-SVC, Seed-VC, or future SVC engines.
 
 ## Render backends
 

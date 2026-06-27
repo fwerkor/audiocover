@@ -134,12 +134,6 @@ jobs:
             python: '3.12'
             name: macos-arm64
             os: macos-latest
-          - backend: rvc
-            packages: '"rvc-python==0.1.5"'
-            pip: '"pip<24.1"'
-            python: '3.10'
-            name: linux-x64
-            os: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v6

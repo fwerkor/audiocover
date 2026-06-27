@@ -26,20 +26,17 @@ MAC_APP_DIR = DIST_DIR / "AudioCover.app"
 RUNTIME_DIR = ROOT / "backend-runtimes"
 WORKERS = {
     "simple-timbre": "audiocover.workers.simple_timbre_worker",
-    "rvc": "audiocover.workers.rvc_worker",
     "so-vits-svc": "audiocover.workers.so_vits_svc_worker",
     "demucs-separator": "audiocover.workers.demucs_separator_worker",
 }
 WORKER_SETS = {
     "desktop": ("simple-timbre",),
     "simple": ("simple-timbre",),
-    "rvc": ("rvc",),
     "so-vits-svc": ("so-vits-svc",),
     "demucs": ("demucs-separator",),
     "all": tuple(WORKERS),
 }
 WORKER_COLLECTS = {
-    "rvc": ("rvc_python",),
     "so-vits-svc": ("so_vits_svc_fork", "librosa", "sklearn", "tensorboard"),
     "demucs-separator": ("demucs",),
 }

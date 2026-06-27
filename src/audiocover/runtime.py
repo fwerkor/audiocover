@@ -53,13 +53,12 @@ class RuntimeCapabilities:
 
 WORKER_MODULES = {
     "simple-timbre": "simple_timbre_worker",
-    "rvc": "rvc_worker",
     "so-vits-svc": "so_vits_svc_worker",
     "demucs-separator": "demucs_separator_worker",
 }
 
-TRAINING_ORDER = ("rvc", "so-vits-svc", "simple-timbre")
-CONVERSION_ORDER = ("rvc", "so-vits-svc", "simple-timbre")
+TRAINING_ORDER = ("so-vits-svc", "simple-timbre")
+CONVERSION_ORDER = ("so-vits-svc", "simple-timbre")
 SEPARATOR_ORDER = ("demucs-separator",)
 
 

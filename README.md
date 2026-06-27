@@ -19,7 +19,7 @@ Use the desktop artifact for your platform, then add the matching backend runtim
 | Platform | Desktop artifact | Runtime packs |
 | --- | --- | --- |
 | Windows x64 | `audiocover-windows-x64.zip` | `audiocover-backend-runtimes-demucs-windows-x64.zip`, `audiocover-backend-runtimes-so-vits-svc-windows-x64.zip` |
-| Linux x64 | `audiocover-linux-x64.tar.gz` | `audiocover-backend-runtimes-demucs-linux-x64.tar.gz`, `audiocover-backend-runtimes-so-vits-svc-linux-x64.tar.gz`, `audiocover-backend-runtimes-rvc-linux-x64.tar.gz` |
+| Linux x64 | `audiocover-linux-x64.tar.gz` | `audiocover-backend-runtimes-demucs-linux-x64.tar.gz`, `audiocover-backend-runtimes-so-vits-svc-linux-x64.tar.gz` |
 | Linux arm64 | `audiocover-linux-arm64.tar.gz` | `audiocover-backend-runtimes-demucs-linux-arm64.tar.gz`, `audiocover-backend-runtimes-so-vits-svc-linux-arm64.tar.gz` |
 | macOS arm64 | `audiocover-macos-arm64.tar.gz` | `audiocover-backend-runtimes-demucs-macos-arm64.tar.gz`, `audiocover-backend-runtimes-so-vits-svc-macos-arm64.tar.gz` |
 

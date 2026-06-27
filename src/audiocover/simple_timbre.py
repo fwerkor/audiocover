@@ -37,7 +37,7 @@ def train_simple_timbre(dataset_wavs: Path, output_path: Path, sample_rate: int 
         "sample_rate": sample_rate,
         "n_bins": int(len(spectrum)),
         "mean_spectrum": spectrum.tolist(),
-        "note": "Lightweight spectral profile for tests/fallback. Use external RVC/SVC backend for best quality.",
+        "note": "Lightweight spectral profile for tests/fallback. Use a full SVC backend for best quality.",
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(profile, ensure_ascii=False, indent=2), encoding="utf-8")

@@ -68,3 +68,15 @@ def test_so_vits_runtime_pack_includes_hubert_import_chain() -> None:
     assert "torch.utils.tensorboard.writer" in hidden_imports
     assert "torch._inductor" not in build_desktop.WORKER_EXCLUDES
     assert "torch.utils.tensorboard" not in build_desktop.WORKER_EXCLUDES
+
+def test_so_vits_runtime_assets_pin_huggingface_revisions() -> None:
+    build_desktop = _build_desktop_module()
+
+    urls = [url for _name, url in build_desktop.RUNTIME_ASSETS["so-vits-svc"]]
+    assert all("/resolve/main/" not in url for url in urls)
+    assert all("/resolve/" in url for url in urls)
+    assert all(build_desktop.CONTENTVEC_REVISION in url for url in urls[:2])
+    assert all(build_desktop.SOVITS_INIT_REVISION in url for url in urls[2:])
+    assert len(build_desktop.CONTENTVEC_REVISION) == 40
+    assert len(build_desktop.SOVITS_INIT_REVISION) == 40
+

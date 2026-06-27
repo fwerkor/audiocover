@@ -54,23 +54,43 @@ WORKER_HIDDEN_IMPORTS = {
 RUNTIME_SELF_TESTS = {
     "so-vits-svc": "self_test",
 }
+CONTENTVEC_REVISION = "1f864bcb6b3f6138c4c52d83044d0242ea6274d3"
+SOVITS_INIT_REVISION = "cf12670fbb4c125a2d1502973bf8d5ab37d6be7e"
+
+
+def _hf_model_url(repo: str, revision: str, path: str) -> str:
+    return f"https://huggingface.co/{repo}/resolve/{revision}/{path}"
+
+
+def _hf_dataset_url(repo: str, revision: str, path: str) -> str:
+    return f"https://huggingface.co/datasets/{repo}/resolve/{revision}/{path}"
+
+
 RUNTIME_ASSETS = {
     "so-vits-svc": (
         (
             "content-vec-best/config.json",
-            "https://huggingface.co/fwerkor/content-vec-best/resolve/main/config.json",
+            _hf_model_url("fwerkor/content-vec-best", CONTENTVEC_REVISION, "config.json"),
         ),
         (
             "content-vec-best/pytorch_model.bin",
-            "https://huggingface.co/fwerkor/content-vec-best/resolve/main/pytorch_model.bin",
+            _hf_model_url("fwerkor/content-vec-best", CONTENTVEC_REVISION, "pytorch_model.bin"),
         ),
         (
             "so-vits-svc-init/D_0.pth",
-            "https://huggingface.co/datasets/ms903/sovits4.0-768vec-layer12/resolve/main/sovits_768l12_pre_large_320k/clean_D_320000.pth",
+            _hf_dataset_url(
+                "ms903/sovits4.0-768vec-layer12",
+                SOVITS_INIT_REVISION,
+                "sovits_768l12_pre_large_320k/clean_D_320000.pth",
+            ),
         ),
         (
             "so-vits-svc-init/G_0.pth",
-            "https://huggingface.co/datasets/ms903/sovits4.0-768vec-layer12/resolve/main/sovits_768l12_pre_large_320k/clean_G_320000.pth",
+            _hf_dataset_url(
+                "ms903/sovits4.0-768vec-layer12",
+                SOVITS_INIT_REVISION,
+                "sovits_768l12_pre_large_320k/clean_G_320000.pth",
+            ),
         ),
     ),
 }

@@ -27,8 +27,8 @@ def test_so_vits_backend_extra_declares_decoder_dependencies() -> None:
 
     for dependency in (
         "so-vits-svc-fork==4.2.30",
-        "torch>=2.2.0",
-        "torchaudio>=2.2.0",
+        "torch>=2.8.0",
+        "torchaudio>=2.8.0",
         "tensorboard>=2.16.0",
         "scikit-learn>=1.4.0",
         "tqdm-joblib>=0.0.4",
@@ -41,8 +41,8 @@ def test_release_matrix_installs_so_vits_decoder_dependencies() -> None:
 
     for dependency in (
         "so-vits-svc-fork==4.2.30",
-        "torch>=2.2.0",
-        "torchaudio>=2.2.0",
+        "torch>=2.8.0",
+        "torchaudio>=2.8.0",
         "tensorboard>=2.16.0",
         "scikit-learn>=1.4.0",
         "tqdm-joblib>=0.0.4",
@@ -50,12 +50,12 @@ def test_release_matrix_installs_so_vits_decoder_dependencies() -> None:
         assert workflow.count(dependency) >= 4
 
 
-def test_windows_so_vits_runtime_uses_cuda_128_pytorch_wheels() -> None:
+def test_windows_so_vits_runtime_uses_cuda_130_pytorch_wheels() -> None:
     workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
 
-    assert "https://download.pytorch.org/whl/cu128" in workflow
-    assert "torch==2.7.1+cu128" in workflow
-    assert "torchaudio==2.7.1+cu128" in workflow
+    assert "https://download.pytorch.org/whl/cu130" in workflow
+    assert "torch==2.11.0+cu130" in workflow
+    assert "torchaudio==2.11.0+cu130" in workflow
     assert "torch==2.5.1+cu121" not in workflow
     assert "torchaudio==2.5.1+cu121" not in workflow
 

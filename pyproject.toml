@@ -48,8 +48,8 @@ demucs-backend = [
 ]
 so-vits-svc-backend = [
   "so-vits-svc-fork==4.2.30",
-  "torch>=2.2.0",
-  "torchaudio>=2.2.0",
+  "torch>=2.8.0",
+  "torchaudio>=2.8.0",
   "tensorboard>=2.16.0",
   "scikit-learn>=1.4.0",
   "tqdm-joblib>=0.0.4",

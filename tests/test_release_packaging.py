@@ -50,6 +50,16 @@ def test_release_matrix_installs_so_vits_decoder_dependencies() -> None:
         assert workflow.count(dependency) >= 4
 
 
+def test_windows_so_vits_runtime_uses_cuda_128_pytorch_wheels() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+
+    assert "https://download.pytorch.org/whl/cu128" in workflow
+    assert "torch==2.7.1+cu128" in workflow
+    assert "torchaudio==2.7.1+cu128" in workflow
+    assert "torch==2.5.1+cu121" not in workflow
+    assert "torchaudio==2.5.1+cu121" not in workflow
+
+
 def test_build_script_self_tests_so_vits_runtime_without_torchcodec() -> None:
     build_desktop = _build_desktop_module()
 

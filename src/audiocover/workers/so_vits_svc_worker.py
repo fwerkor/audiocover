@@ -257,6 +257,8 @@ def _resolve_torch_device(preferred: str | None) -> tuple[str, str | None]:
                 device = torch.device(candidate)
                 probe = torch.empty((1,), device=device)
                 probe += 1
+                matmul_probe = torch.eye(8, device=device) @ torch.eye(8, device=device)
+                _ = float(matmul_probe[0, 0].detach().cpu())
                 torch.cuda.synchronize(device)
                 return str(device), None
             except Exception as exc:
@@ -271,6 +273,15 @@ def _resolve_torch_device(preferred: str | None) -> tuple[str, str | None]:
         except Exception as exc:
             failures.append(f"{candidate} initialization failed: {type(exc).__name__}: {exc}")
     return "cpu", "; ".join(failures) if failures else "no usable training device found"
+
+
+def _should_fail_training_device_fallback(preferred: str | None, fallback_reason: str | None) -> bool:
+    if not fallback_reason:
+        return False
+    requested = (preferred or "auto").strip().lower()
+    if requested in {"gpu", "cuda"} or requested.startswith("cuda:"):
+        return True
+    return requested in {"", "auto"} and "initialization failed" in fallback_reason
 
 
 def _patch_so_vits_device_selection(device: str) -> None:
@@ -332,17 +343,17 @@ def _install_lightning_trainer_device_defaults(device: str):
 
     def trainer_with_device_defaults(*args, **kwargs):
         if device.startswith("cuda"):
-            kwargs.setdefault("accelerator", "gpu")
+            kwargs["accelerator"] = "gpu"
             if ":" in device:
-                kwargs.setdefault("devices", [int(device.rsplit(":", 1)[1])])
+                kwargs["devices"] = [int(device.rsplit(":", 1)[1])]
             else:
-                kwargs.setdefault("devices", 1)
+                kwargs["devices"] = 1
         elif device == "cpu":
-            kwargs.setdefault("accelerator", "cpu")
-            kwargs.setdefault("devices", 1)
+            kwargs["accelerator"] = "cpu"
+            kwargs["devices"] = 1
         elif device == "mps":
-            kwargs.setdefault("accelerator", "mps")
-            kwargs.setdefault("devices", 1)
+            kwargs["accelerator"] = "mps"
+            kwargs["devices"] = 1
         callbacks = list(kwargs.get("callbacks") or [])
         callbacks = [callback for callback in callbacks if callback.__class__.__name__ != "RichProgressBar"]
         if not any(getattr(callback, "_audiocover_progress", False) for callback in callbacks):
@@ -603,8 +614,15 @@ def train(payload: dict[str, Any]) -> dict[str, Any]:
     _patch_torchaudio_wav_loader()
     _patch_so_vits_numpy_plotting()
     print(f"so-vits-svc: {_format_torch_device_report()}", flush=True)
-    training_device, fallback_reason = _resolve_torch_device(str(payload.get("device") or "auto"))
+    requested_device = str(payload.get("device") or "auto")
+    training_device, fallback_reason = _resolve_torch_device(requested_device)
     if fallback_reason and training_device == "cpu":
+        if _should_fail_training_device_fallback(requested_device, fallback_reason):
+            print(f"so-vits-svc: CUDA unusable for training ({fallback_reason}); refusing CPU fallback", flush=True)
+            raise RuntimeError(
+                "So-VITS-SVC training found a CUDA device but could not run CUDA kernels. "
+                f"Install a runtime pack built with a compatible CUDA PyTorch wheel. Details: {fallback_reason}"
+            )
         print(f"so-vits-svc: CUDA unavailable for training ({fallback_reason}); falling back to CPU", flush=True)
     print(f"so-vits-svc: selected training device: {training_device}", flush=True)
     _patch_so_vits_device_selection(training_device)

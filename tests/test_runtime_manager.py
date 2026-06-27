@@ -388,6 +388,21 @@ class _FakeTensor:
     def __iadd__(self, _value):
         return self
 
+    def __matmul__(self, _other):
+        return self
+
+    def __getitem__(self, _item):
+        return self
+
+    def detach(self):
+        return self
+
+    def cpu(self):
+        return self
+
+    def __float__(self):
+        return 1.0
+
 
 class _FakeTorchDevice:
     def __init__(self, value: str):
@@ -411,6 +426,7 @@ def test_so_vits_worker_cuda_first_device_falls_back_to_cpu_without_cuda_build(m
         ),
         device=_FakeTorchDevice,
         empty=lambda _shape, device=None: _FakeTensor(),
+        eye=lambda _size, device=None: _FakeTensor(),
     )
     monkeypatch.setitem(sys.modules, "torch", fake_torch)
 
@@ -434,6 +450,7 @@ def test_so_vits_worker_cuda_first_device_uses_cuda_when_probe_succeeds(monkeypa
         ),
         device=_FakeTorchDevice,
         empty=lambda _shape, device=None: _FakeTensor(),
+        eye=lambda _size, device=None: _FakeTensor(),
     )
     monkeypatch.setitem(sys.modules, "torch", fake_torch)
 
@@ -441,6 +458,48 @@ def test_so_vits_worker_cuda_first_device_uses_cuda_when_probe_succeeds(monkeypa
 
     assert device == "cuda"
     assert reason is None
+
+
+def test_so_vits_worker_auto_training_fails_on_cuda_kernel_failure() -> None:
+    from audiocover.workers import so_vits_svc_worker
+
+    assert so_vits_svc_worker._should_fail_training_device_fallback(
+        "auto", "cuda initialization failed: RuntimeError: no kernel image is available"
+    )
+    assert so_vits_svc_worker._should_fail_training_device_fallback(
+        "cuda", "torch.cuda.is_available() is false"
+    )
+    assert not so_vits_svc_worker._should_fail_training_device_fallback(
+        "auto", "CUDA PyTorch build is not installed"
+    )
+
+
+def test_so_vits_worker_lightning_trainer_overrides_cpu_defaults(monkeypatch) -> None:
+    from audiocover.workers import so_vits_svc_worker
+
+    calls = []
+
+    class FakeCallback:
+        pass
+
+    def fake_trainer(*args, **kwargs):
+        calls.append((args, kwargs))
+        return SimpleNamespace()
+
+    fake_pl = SimpleNamespace(Callback=FakeCallback, Trainer=fake_trainer)
+    fake_lightning = SimpleNamespace(pytorch=fake_pl)
+    monkeypatch.setitem(sys.modules, "lightning", fake_lightning)
+    monkeypatch.setitem(sys.modules, "lightning.pytorch", fake_pl)
+
+    original = so_vits_svc_worker._install_lightning_trainer_device_defaults("cuda")
+    try:
+        fake_pl.Trainer(accelerator="cpu", devices=1, callbacks=[])
+    finally:
+        so_vits_svc_worker._restore_lightning_trainer(original)
+
+    assert calls
+    assert calls[0][1]["accelerator"] == "gpu"
+    assert calls[0][1]["devices"] == 1
 
 
 def test_so_vits_worker_patches_numpy_binary_plotting(monkeypatch) -> None:

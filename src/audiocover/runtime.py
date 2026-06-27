@@ -107,6 +107,9 @@ def _prepare_env() -> dict[str, str]:
     if not sys.platform.startswith("win"):
         env.setdefault("LC_ALL", "C.UTF-8")
         env.setdefault("LANG", "C.UTF-8")
+    if getattr(sys, "frozen", False):
+        env["AUDIOCOVER_BINARY_CPU_ONLY"] = "1"
+        env.setdefault("CUDA_VISIBLE_DEVICES", "")
     return env
 
 
@@ -167,6 +170,8 @@ def _exe_names(worker_name: str) -> tuple[str, ...]:
 
 
 def _source_command(worker_name: str) -> tuple[str, ...] | None:
+    if getattr(sys, "frozen", False):
+        return (sys.executable, "--audiocover-worker", worker_name)
     module = WORKER_MODULES.get(worker_name)
     if module is None:
         return None

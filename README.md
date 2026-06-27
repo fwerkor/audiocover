@@ -5,47 +5,34 @@ AudioCover is a desktop GUI and CLI for local audio-cover workflows. It prepares
 ## Features
 
 - Desktop GUI for training data, model package, song input, output folder, and rights confirmation.
-- Automatic backend runtime selection without a user-facing backend picker.
+- CPU-only release binaries for Windows, Linux, and macOS.
+- Single-binary desktop delivery: no external `_internal` folder and no separate `backend-runtimes` pack for normal desktop use.
+- Automatic backend selection without a user-facing backend picker.
 - Automatic octave-level pitch range adaptation from the trained voice profile.
-- Isolated backend workers that communicate with the main app through JSON stdin/stdout.
-- Split backend runtime packs for large or conflicting engines.
 - CLI commands for dataset preparation, training, rendering, quality checks, and diagnostics.
 - Reproducible output folders with manifests, quality-control reports, and intermediate audio files.
 
-## Download
+## Download desktop builds
 
-Use the desktop artifact for your platform, then add the matching backend runtime packs.
+Download the single binary for your platform from the release page.
 
-| Platform | Desktop artifact | Runtime packs |
+| Platform | Artifact | Notes |
 | --- | --- | --- |
-| Windows x64 | `audiocover-windows-x64.zip` | `audiocover-backend-runtimes-demucs-windows-x64.zip`, `audiocover-backend-runtimes-so-vits-svc-windows-x64.zip` |
-| Linux x64 | `audiocover-linux-x64.tar.gz` | `audiocover-backend-runtimes-demucs-linux-x64.tar.gz`, `audiocover-backend-runtimes-so-vits-svc-linux-x64.tar.gz` |
-| Linux arm64 | `audiocover-linux-arm64.tar.gz` | `audiocover-backend-runtimes-demucs-linux-arm64.tar.gz`, `audiocover-backend-runtimes-so-vits-svc-linux-arm64.tar.gz` |
-| macOS arm64 | `audiocover-macos-arm64.tar.gz` | `audiocover-backend-runtimes-demucs-macos-arm64.tar.gz`, `audiocover-backend-runtimes-so-vits-svc-macos-arm64.tar.gz` |
+| Windows x64 | `audiocover-windows-x64.exe` | CPU-only |
+| Linux x64 | `audiocover-linux-x64` | CPU-only; make executable before running |
+| Linux arm64 | `audiocover-linux-arm64` | CPU-only; make executable before running |
+| macOS arm64 | `audiocover-macos-arm64` | CPU-only; make executable before running |
 
-The Python wheel and source archive are for package/developer use. Desktop users normally do not need them.
+The Python wheel and source archive are for package/developer use. Desktop users normally only need the platform binary.
 
-## Install desktop builds
-
-Create one install directory, extract the desktop artifact into it, then extract runtime packs into the same install directory.
+## Run desktop builds
 
 ### Windows x64
 
 ```powershell
 mkdir C:\AudioCover
-Expand-Archive .\audiocover-windows-x64.zip C:\AudioCover
-Expand-Archive .\audiocover-backend-runtimes-demucs-windows-x64.zip C:\AudioCover
-Expand-Archive .\audiocover-backend-runtimes-so-vits-svc-windows-x64.zip C:\AudioCover
-C:\AudioCover\AudioCover\AudioCover.exe
-```
-
-Expected layout:
-
-```text
-C:\AudioCover\AudioCover\AudioCover.exe
-C:\AudioCover\AudioCover\_internal\...
-C:\AudioCover\backend-runtimes\demucs-separator\demucs-separator.exe
-C:\AudioCover\backend-runtimes\so-vits-svc\so-vits-svc.exe
+Move-Item .\audiocover-windows-x64.exe C:\AudioCover\AudioCover.exe
+C:\AudioCover\AudioCover.exe
 ```
 
 If SmartScreen appears, choose **More info** and **Run anyway**.
@@ -54,77 +41,40 @@ If SmartScreen appears, choose **More info** and **Run anyway**.
 
 ```bash
 mkdir -p ~/AudioCover
-cd ~/AudioCover
-tar -xzf ~/Downloads/audiocover-linux-x64.tar.gz
-tar -xzf ~/Downloads/audiocover-backend-runtimes-demucs-linux-x64.tar.gz
-tar -xzf ~/Downloads/audiocover-backend-runtimes-so-vits-svc-linux-x64.tar.gz
-./AudioCover/AudioCover
+cp ~/Downloads/audiocover-linux-x64 ~/AudioCover/AudioCover
+chmod +x ~/AudioCover/AudioCover
+~/AudioCover/AudioCover
 ```
 
-For Linux arm64, use the `linux-arm64` desktop and runtime pack names instead.
-
-Expected layout:
-
-```text
-~/AudioCover/AudioCover/AudioCover
-~/AudioCover/AudioCover/_internal/...
-~/AudioCover/backend-runtimes/demucs-separator/demucs-separator
-~/AudioCover/backend-runtimes/so-vits-svc/so-vits-svc
-```
+For Linux arm64, replace `audiocover-linux-x64` with `audiocover-linux-arm64`.
 
 ### macOS arm64
 
 ```bash
 mkdir -p ~/AudioCover
-cd ~/AudioCover
-tar -xzf ~/Downloads/audiocover-macos-arm64.tar.gz
-tar -xzf ~/Downloads/audiocover-backend-runtimes-demucs-macos-arm64.tar.gz
-tar -xzf ~/Downloads/audiocover-backend-runtimes-so-vits-svc-macos-arm64.tar.gz
-open ./AudioCover.app
+cp ~/Downloads/audiocover-macos-arm64 ~/AudioCover/AudioCover
+chmod +x ~/AudioCover/AudioCover
+~/AudioCover/AudioCover
 ```
 
-Expected layout:
-
-```text
-~/AudioCover/AudioCover.app
-~/AudioCover/backend-runtimes/demucs-separator/demucs-separator
-~/AudioCover/backend-runtimes/so-vits-svc/so-vits-svc
-```
-
-If macOS Gatekeeper blocks the app, open **System Settings → Privacy & Security** and allow the app, or run it once from Terminal:
+If macOS Gatekeeper blocks the binary, open **System Settings → Privacy & Security** and allow it, or run:
 
 ```bash
-xattr -dr com.apple.quarantine ~/AudioCover/AudioCover.app
-open ~/AudioCover/AudioCover.app
+xattr -d com.apple.quarantine ~/AudioCover/AudioCover
+~/AudioCover/AudioCover
 ```
 
-## Split runtime pack files
+## Single-file behavior
 
-Large Linux runtime packs may be published as parts, for example:
+Release binaries are PyInstaller one-file executables. Backend code and pinned So-VITS-SVC model assets are embedded in the binary. At launch, the executable extracts its runtime into the operating system temporary directory. Embedded worker subprocesses are launched through the same executable and reuse the extracted application home while the parent process is alive.
 
-```text
-audiocover-backend-runtimes-so-vits-svc-linux-x64.tar.gz.part001
-audiocover-backend-runtimes-so-vits-svc-linux-x64.tar.gz.part002
-audiocover-backend-runtimes-so-vits-svc-linux-x64.tar.gz.sha256
-```
+Practical implications:
 
-Download all parts for that runtime pack into the same directory, then join them before extraction.
-
-Windows PowerShell:
-
-```powershell
-cmd /c copy /b "audiocover-backend-runtimes-so-vits-svc-linux-x64.tar.gz.part001"+"audiocover-backend-runtimes-so-vits-svc-linux-x64.tar.gz.part002" "audiocover-backend-runtimes-so-vits-svc-linux-x64.tar.gz"
-```
-
-Linux/macOS:
-
-```bash
-cat audiocover-backend-runtimes-so-vits-svc-linux-x64.tar.gz.part* > audiocover-backend-runtimes-so-vits-svc-linux-x64.tar.gz
-sha256sum -c audiocover-backend-runtimes-so-vits-svc-linux-x64.tar.gz.sha256  # Linux
-shasum -a 256 -c audiocover-backend-runtimes-so-vits-svc-linux-x64.tar.gz.sha256  # macOS
-```
-
-Then extract the joined `.tar.gz` file into the install directory.
+- Keep enough free space in the system temporary directory. Several GB of temporary space is recommended for training or rendering.
+- First launch can be slower because native libraries and model assets need to be unpacked.
+- Antivirus or endpoint protection can slow the first launch on Windows.
+- Do not delete the temporary extraction directory while AudioCover is running.
+- Release binaries force CPU execution. CUDA/MPS GPU execution is intentionally only supported from source.
 
 ## GUI workflow
 
@@ -165,13 +115,130 @@ audiocover render track.mp3 --model models/my_profile/model.yaml --out runs/trac
 audiocover doctor
 ```
 
-## Backend runtimes
+## Run from source
 
-AudioCover uses a runtime manager in the main process and isolated worker executables under `backend-runtimes/`. Workers are invoked with JSON requests over stdin/stdout, which keeps backend dependency sets separated from the GUI process.
+Source runs are intended for development and for users who want GPU acceleration. Use Python 3.10-3.12.
 
-Desktop artifacts include the lightweight built-in worker. Runtime packs provide larger backend workers and any packaged model assets required by those workers. The runtime manager discovers `backend-runtimes/` in the install directory, beside the executable, or through `AUDIOCOVER_BACKEND_RUNTIMES`. Python, pip, and backend command-line tools do not need to be installed by desktop users.
+### 1. Clone and create a virtual environment
 
-Backend workers do not silently download missing model assets during normal desktop use. If a required asset is missing, install the matching runtime pack. Developers who intentionally want legacy runtime downloads can set `AUDIOCOVER_ALLOW_RUNTIME_DOWNLOADS=1`.
+```bash
+git clone https://github.com/fwerkor/audiocover.git
+cd audiocover
+python -m venv .venv
+```
+
+Activate it:
+
+```bash
+# Windows PowerShell
+.\.venv\Scripts\Activate.ps1
+
+# Linux/macOS
+source .venv/bin/activate
+```
+
+### 2. Install PyTorch
+
+For CPU source runs:
+
+```bash
+python -m pip install -U pip
+python -m pip install --index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple torch torchaudio
+```
+
+For NVIDIA GPU source runs, install the CUDA wheel matching your driver and CUDA runtime. Example for CUDA 13.0 wheels:
+
+```bash
+python -m pip install -U pip
+python -m pip install --index-url https://download.pytorch.org/whl/cu130 torch torchaudio
+```
+
+For macOS Apple Silicon GPU/MPS source runs, install the normal PyPI wheels:
+
+```bash
+python -m pip install -U pip
+python -m pip install torch torchaudio
+```
+
+Verify the device:
+
+```bash
+python - <<'PY'
+import torch
+print('torch:', torch.__version__)
+print('cuda build:', torch.version.cuda)
+print('cuda available:', torch.cuda.is_available())
+print('mps available:', getattr(torch.backends, 'mps', None) is not None and torch.backends.mps.is_available())
+PY
+```
+
+### 3. Install AudioCover dependencies
+
+```bash
+python -m pip install -e ".[full,so-vits-svc-backend]"
+```
+
+For development checks, use:
+
+```bash
+python -m pip install -e ".[dev,full,so-vits-svc-backend]"
+```
+
+### 4. Prepare pinned model assets
+
+So-VITS-SVC uses pinned ContentVec and initialization checkpoint assets. Download them once:
+
+```bash
+python scripts/build_desktop.py --prepare-assets-only
+```
+
+This stores assets under:
+
+```text
+build/audiocover-bundle-assets/
+  content-vec-best/
+  so-vits-svc-init/
+```
+
+AudioCover source workers look there automatically. You can also store the same layout elsewhere and set:
+
+```bash
+# Windows PowerShell
+$env:AUDIOCOVER_ASSETS_DIR = "D:\AudioCoverAssets"
+
+# Linux/macOS
+export AUDIOCOVER_ASSETS_DIR=/opt/audiocover-assets
+```
+
+### 5. Run
+
+GUI:
+
+```bash
+python -m audiocover.gui
+```
+
+CLI:
+
+```bash
+audiocover train data/my_recordings models/my_profile --consent
+audiocover render track.mp3 --model models/my_profile/model.yaml --out runs/track --consent
+audiocover doctor
+```
+
+By default, source runs select the best available PyTorch device. To force CPU or CUDA for training/config files, set `device: cpu`, `device: cuda`, or `device: cuda:0` in the relevant config.
+
+## Build release-style binaries locally
+
+CPU-only single-file build:
+
+```bash
+python -m pip install --index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple torch torchaudio
+python -m pip install -e ".[build,demucs-backend,so-vits-svc-backend]"
+python scripts/build_desktop.py
+```
+
+The output is written to `dist/audiocover-<platform>` or `dist/audiocover-<platform>.exe`.
 
 ## Responsible use
 

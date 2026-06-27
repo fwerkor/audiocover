@@ -48,6 +48,9 @@ def _asset_dir(name: str, required_files: tuple[str, ...]) -> Path | None:
     env_value = os.environ.get(env_var)
     if env_value:
         candidates.append(Path(env_value).expanduser())
+    common_assets = os.environ.get("AUDIOCOVER_ASSETS_DIR")
+    if common_assets:
+        candidates.append(Path(common_assets).expanduser() / name)
 
     executable_dir = Path(sys.executable).resolve().parent
     candidates.extend(
@@ -65,7 +68,9 @@ def _asset_dir(name: str, required_files: tuple[str, ...]) -> Path | None:
     source_path = Path(__file__).resolve()
     candidates.append(source_path.parent / "assets" / name)
     if len(source_path.parents) > 3:
-        candidates.append(source_path.parents[3] / "backend-runtimes" / "so-vits-svc" / "assets" / name)
+        source_root = source_path.parents[3]
+        candidates.append(source_root / "build" / "audiocover-bundle-assets" / name)
+        candidates.append(source_root / "backend-runtimes" / "so-vits-svc" / "assets" / name)
 
     seen: set[Path] = set()
     for candidate in candidates:
@@ -93,8 +98,9 @@ def _patch_contentvec_loader() -> None:
             print("so-vits-svc: bundled ContentVec model not found; runtime downloads are enabled", flush=True)
             return
         raise RuntimeError(
-            "So-VITS-SVC ContentVec assets are missing. Install the matching "
-            "audiocover-backend-runtimes-so-vits-svc pack, or set "
+            "So-VITS-SVC ContentVec assets are missing. Run "
+            "python scripts/build_desktop.py --prepare-assets-only for source use, "
+            "set AUDIOCOVER_ASSETS_DIR to a prepared asset directory, or set "
             "AUDIOCOVER_ALLOW_RUNTIME_DOWNLOADS=1 to allow explicit runtime downloads."
         )
 
@@ -136,8 +142,9 @@ def _copy_bundled_init_checkpoints(model_dir: Path) -> None:
             print("so-vits-svc: bundled initialization checkpoints not found; runtime downloads are enabled", flush=True)
             return
         raise RuntimeError(
-            "So-VITS-SVC initialization checkpoints are missing. Install the matching "
-            "audiocover-backend-runtimes-so-vits-svc pack, or set "
+            "So-VITS-SVC initialization checkpoints are missing. Run "
+            "python scripts/build_desktop.py --prepare-assets-only for source use, "
+            "set AUDIOCOVER_ASSETS_DIR to a prepared asset directory, or set "
             "AUDIOCOVER_ALLOW_RUNTIME_DOWNLOADS=1 to allow explicit runtime downloads."
         )
     model_dir.mkdir(parents=True, exist_ok=True)
@@ -228,6 +235,10 @@ def _format_torch_device_report() -> str:
 
 def _resolve_torch_device(preferred: str | None) -> tuple[str, str | None]:
     requested = (preferred or "auto").strip().lower()
+    if os.environ.get("AUDIOCOVER_BINARY_CPU_ONLY", "").lower() in {"1", "true", "yes"}:
+        if requested in {"gpu", "cuda"} or requested.startswith("cuda:"):
+            return "cpu", "AudioCover release binaries are CPU-only; run from source with a CUDA/MPS PyTorch build for GPU execution"
+        return "cpu", None
     if requested in {"", "auto"}:
         candidates = ["cuda", "cpu"]
     elif requested in {"gpu", "cuda"} or requested.startswith("cuda:"):

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 from pathlib import Path
 from typing import Any, Literal
 
@@ -183,6 +184,8 @@ def _module_available(name: str) -> bool:
 
 
 def best_available_torch_device() -> str:
+    if os.environ.get("AUDIOCOVER_BINARY_CPU_ONLY", "").lower() in {"1", "true", "yes"}:
+        return "cpu"
     try:
         import torch  # type: ignore[import-not-found]
     except Exception:

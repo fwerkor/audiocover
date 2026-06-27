@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Release tag to create, for example v0.5.0'
+        description: 'Release tag to create, for example v0.9.0'
         required: true
         type: string
       prerelease:
@@ -45,95 +45,20 @@ jobs:
         include:
           - name: windows-x64
             os: windows-latest
+            python: '3.12'
+            pytorch: cpu-index
           - name: linux-x64
             os: ubuntu-latest
+            python: '3.12'
+            pytorch: cpu-index
           - name: linux-arm64
             os: ubuntu-24.04-arm
+            python: '3.12'
+            pytorch: pypi
           - name: macos-arm64
             os: macos-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-      - name: Install platform packages on Ubuntu
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg libsndfile1 python3-tk
-      - name: Install FFmpeg on Windows
-        if: runner.os == 'Windows'
-        run: choco install ffmpeg -y
-      - name: Install FFmpeg on macOS
-        if: runner.os == 'macOS'
-        run: |
-          brew untap aws/tap || true
-          brew install ffmpeg
-      - name: Install desktop build dependencies
-        run: python -m pip install -U pip && python -m pip install -e ".[build]"
-      - name: Build desktop bundle
-        run: python scripts/build_desktop.py --worker-set desktop
-      - name: Smoke test desktop bundle
-        run: python scripts/build_desktop.py --smoke-test-only
-      - uses: actions/upload-artifact@v4
-        with:
-          name: desktop-${{ matrix.name }}
-          path: dist/audiocover-*
-          if-no-files-found: error
-
-  build-runtime-pack:
-    name: runtime ${{ matrix.backend }} ${{ matrix.name }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - backend: demucs
-            packages: '"torch>=2.2.0" "torchaudio>=2.2.0" "demucs>=4.0.1"'
-            pip: pip
             python: '3.12'
-            name: windows-x64
-            os: windows-latest
-          - backend: demucs
-            packages: '"torch>=2.2.0" "torchaudio>=2.2.0" "demucs>=4.0.1"'
-            pip: pip
-            python: '3.12'
-            name: linux-x64
-            os: ubuntu-latest
-          - backend: demucs
-            packages: '"torch>=2.2.0" "torchaudio>=2.2.0" "demucs>=4.0.1"'
-            pip: pip
-            python: '3.12'
-            name: linux-arm64
-            os: ubuntu-24.04-arm
-          - backend: demucs
-            packages: '"torch>=2.2.0" "torchaudio>=2.2.0" "demucs>=4.0.1"'
-            pip: pip
-            python: '3.12'
-            name: macos-arm64
-            os: macos-latest
-          - backend: so-vits-svc
-            packages: '"so-vits-svc-fork==4.2.30" "torch>=2.8.0" "torchaudio>=2.8.0" "tensorboard>=2.16.0" "scikit-learn>=1.4.0" "tqdm-joblib>=0.0.4"'
-            pip: pip
-            python: '3.12'
-            name: windows-x64
-            os: windows-latest
-          - backend: so-vits-svc
-            packages: '"so-vits-svc-fork==4.2.30" "torch>=2.8.0" "torchaudio>=2.8.0" "tensorboard>=2.16.0" "scikit-learn>=1.4.0" "tqdm-joblib>=0.0.4"'
-            pip: pip
-            python: '3.12'
-            name: linux-x64
-            os: ubuntu-latest
-          - backend: so-vits-svc
-            packages: '"so-vits-svc-fork==4.2.30" "torch>=2.8.0" "torchaudio>=2.8.0" "tensorboard>=2.16.0" "scikit-learn>=1.4.0" "tqdm-joblib>=0.0.4"'
-            pip: pip
-            python: '3.12'
-            name: linux-arm64
-            os: ubuntu-24.04-arm
-          - backend: so-vits-svc
-            packages: '"so-vits-svc-fork==4.2.30" "torch>=2.8.0" "torchaudio>=2.8.0" "tensorboard>=2.16.0" "scikit-learn>=1.4.0" "tqdm-joblib>=0.0.4"'
-            pip: pip
-            python: '3.12'
-            name: macos-arm64
-            os: macos-latest
+            pytorch: pypi
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
@@ -150,23 +75,26 @@ jobs:
         run: |
           brew untap aws/tap || true
           brew install ffmpeg
-      - name: Install runtime build dependencies
-        run: python -m pip install -U ${{ matrix.pip }} pyinstaller build
-      - name: Install CUDA PyTorch for Windows So-VITS-SVC
-        if: matrix.backend == 'so-vits-svc' && matrix.name == 'windows-x64'
-        run: python -m pip install --index-url https://download.pytorch.org/whl/cu130 "torch==2.11.0+cu130" "torchaudio==2.11.0+cu130"
-      - name: Install runtime Python packages
-        run: python -m pip install ${{ matrix.packages }}
-      - name: Build runtime pack
-        run: python scripts/build_desktop.py --runtime-pack ${{ matrix.backend }}
+      - name: Install CPU PyTorch wheels
+        if: matrix.pytorch == 'cpu-index'
+        run: python -m pip install --index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple "torch==2.8.0+cpu" "torchaudio==2.8.0+cpu"
+      - name: Install macOS PyTorch wheels
+        if: matrix.pytorch == 'pypi'
+        run: python -m pip install "torch==2.8.0" "torchaudio==2.8.0"
+      - name: Install desktop build dependencies
+        run: python -m pip install -U pip && python -m pip install -e ".[build,demucs-backend,so-vits-svc-backend]"
+      - name: Build CPU-only single-file desktop binary
+        run: python scripts/build_desktop.py
+      - name: Smoke test desktop binary
+        run: python scripts/build_desktop.py --smoke-test-only
       - uses: actions/upload-artifact@v4
         with:
-          name: runtime-${{ matrix.backend }}-${{ matrix.name }}
-          path: dist/audiocover-backend-runtimes-*
+          name: desktop-${{ matrix.name }}
+          path: dist/audiocover-*
           if-no-files-found: error
 
   publish:
-    needs: [build-python, build-desktop, build-runtime-pack]
+    needs: [build-python, build-desktop]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -176,9 +104,8 @@ jobs:
         with:
           tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_name }}
           target_commitish: ${{ github.event_name == 'workflow_dispatch' && github.sha || '' }}
-          prerelease: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease || false }}
+          prerelease: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease || startsWith(github.ref_name, 'v0.') }}
           generate_release_notes: true
           files: |
             artifacts/python-dist/*
             artifacts/desktop-*/*
-            artifacts/runtime-*/*

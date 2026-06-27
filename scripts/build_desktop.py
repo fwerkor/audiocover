@@ -24,6 +24,7 @@ SPEC_PATH = ROOT / "packaging" / "audiocover-gui.spec"
 APP_DIR = DIST_DIR / "AudioCover"
 MAC_APP_DIR = DIST_DIR / "AudioCover.app"
 RUNTIME_DIR = ROOT / "backend-runtimes"
+BUNDLE_ASSETS_DIR = BUILD_DIR / "audiocover-bundle-assets"
 WORKERS = {
     "simple-timbre": "audiocover.workers.simple_timbre_worker",
     "so-vits-svc": "audiocover.workers.so_vits_svc_worker",
@@ -186,6 +187,14 @@ def _install_runtime_assets(worker_name: str, worker_dist: Path) -> None:
         _download_file(url, asset_root / relative_name)
 
 
+def install_bundle_assets(*, clean: bool = False) -> None:
+    if clean:
+        shutil.rmtree(BUNDLE_ASSETS_DIR, ignore_errors=True)
+    for assets in RUNTIME_ASSETS.values():
+        for relative_name, url in assets:
+            _download_file(url, BUNDLE_ASSETS_DIR / relative_name)
+
+
 def _capture_json(command: list[str], *, input_json: dict) -> dict:
     process = subprocess.run(
         command,
@@ -216,6 +225,10 @@ def _worker_executable(worker_name: str, runtime_dir: Path = RUNTIME_DIR) -> Pat
 
 
 def _bundle_executable() -> Path:
+    suffix = ".exe" if _normalize_system(platform.system()) == "windows" else ""
+    onefile = DIST_DIR / f"AudioCover{suffix}"
+    if onefile.exists():
+        return onefile
     system = _normalize_system(platform.system())
     if system == "windows":
         return APP_DIR / "AudioCover.exe"
@@ -316,6 +329,34 @@ def smoke_test_workers(
             raise RuntimeError("simple-timbre worker must be available for offline packaged operation")
 
 
+def smoke_test_embedded_workers(worker_names: tuple[str, ...], *, require_available: bool = True) -> None:
+    executable = _bundle_executable()
+    if not executable.exists():
+        raise FileNotFoundError(f"Desktop executable was not found: {executable}")
+    for worker_name in worker_names:
+        result = _capture_json(
+            [str(executable), "--audiocover-worker", worker_name],
+            input_json={"id": "smoke", "action": "capabilities", "payload": {}},
+        )
+        print(
+            f"embedded runtime {worker_name}: available={result.get('available')} "
+            f"actions={result.get('actions')} reason={result.get('reason') or ''}",
+            flush=True,
+        )
+        if require_available and not result.get("available"):
+            raise RuntimeError(f"embedded worker is inactive: {worker_name}: {result.get('reason')}")
+        self_test_action = RUNTIME_SELF_TESTS.get(worker_name)
+        if result.get("available") and self_test_action:
+            self_test = _capture_json(
+                [str(executable), "--audiocover-worker", worker_name],
+                input_json={"id": "self-test", "action": self_test_action, "payload": {}},
+            )
+            print(
+                f"embedded runtime {worker_name}: self-test passed checks={self_test.get('checks', [])}",
+                flush=True,
+            )
+
+
 def smoke_test_bundle() -> None:
     executable = _bundle_executable()
     if not executable.exists():
@@ -327,18 +368,23 @@ def build_bundle(clean: bool) -> None:
     if clean:
         shutil.rmtree(DIST_DIR, ignore_errors=True)
         shutil.rmtree(BUILD_DIR / "audiocover-gui", ignore_errors=True)
+    install_bundle_assets(clean=clean)
     _run(["pyinstaller", "--log-level", "ERROR", str(SPEC_PATH), "--clean", "--noconfirm"])
-    if not (APP_DIR.exists() or MAC_APP_DIR.exists()):
-        raise FileNotFoundError(f"PyInstaller did not create {APP_DIR} or {MAC_APP_DIR}")
+    executable = _bundle_executable()
+    if not executable.exists():
+        raise FileNotFoundError(f"PyInstaller did not create a one-file executable at {executable}")
 
 
 def package_bundle() -> Path:
-    artifact_base = DIST_DIR / f"audiocover-{_platform_name()}"
-    package_dir = MAC_APP_DIR if MAC_APP_DIR.exists() else APP_DIR
-    archive_format = "zip" if _normalize_system(platform.system()) == "windows" else "gztar"
-    artifact = Path(
-        shutil.make_archive(str(artifact_base), archive_format, root_dir=DIST_DIR, base_dir=package_dir.name)
-    )
+    executable = _bundle_executable()
+    if not executable.exists():
+        raise FileNotFoundError(f"Desktop executable was not found: {executable}")
+    suffix = ".exe" if _normalize_system(platform.system()) == "windows" else ""
+    artifact = DIST_DIR / f"audiocover-{_platform_name()}{suffix}"
+    if executable.resolve() != artifact.resolve():
+        shutil.copy2(executable, artifact)
+    if _normalize_system(platform.system()) != "windows":
+        artifact.chmod(artifact.stat().st_mode | 0o755)
     print(f"Built {artifact.relative_to(ROOT)}", flush=True)
     github_output = os.environ.get("GITHUB_OUTPUT")
     if github_output:
@@ -402,11 +448,16 @@ def package_runtime_pack(pack_name: str, runtime_dir: Path = RUNTIME_DIR) -> Pat
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--no-clean", action="store_true", help="reuse existing build directories")
-    parser.add_argument("--worker-set", default="desktop", choices=sorted(WORKER_SETS), help="worker group to build")
+    parser.add_argument("--worker-set", default="all", choices=sorted(WORKER_SETS), help="worker group to build or smoke-test")
     parser.add_argument("--workers-only", action="store_true", help="build and smoke-test backend runtimes only")
     parser.add_argument("--skip-workers", action="store_true", help="reuse existing backend runtimes")
     parser.add_argument("--runtime-smoke-test-only", action="store_true", help="smoke-test existing backend runtimes")
     parser.add_argument("--runtime-pack", choices=sorted(WORKER_SETS), help="build and archive a backend runtime pack")
+    parser.add_argument(
+        "--prepare-assets-only",
+        action="store_true",
+        help="download packaged model assets into build/audiocover-bundle-assets",
+    )
     parser.add_argument(
         "--smoke-test-only",
         action="store_true",
@@ -417,14 +468,18 @@ def main() -> None:
     worker_set = args.runtime_pack or args.worker_set
     worker_names = _worker_names(worker_set)
 
+    if args.prepare_assets_only:
+        install_bundle_assets(clean=not args.no_clean)
+        return
+
     if args.runtime_smoke_test_only:
         smoke_test_workers(worker_names)
         return
 
     if args.smoke_test_only:
-        if not (APP_DIR.exists() or MAC_APP_DIR.exists()):
-            _fail("No existing desktop bundle found; build it before running --smoke-test-only")
-        smoke_test_workers(_worker_names("desktop"))
+        if not _bundle_executable().exists():
+            _fail("No existing desktop executable found; build it before running --smoke-test-only")
+        smoke_test_embedded_workers(worker_names)
         smoke_test_bundle()
         return
 
@@ -434,13 +489,14 @@ def main() -> None:
         package_runtime_pack(args.runtime_pack)
         return
 
-    if not args.skip_workers:
-        build_workers(worker_names, clean=not args.no_clean)
-    smoke_test_workers(worker_names)
     if args.workers_only:
+        if not args.skip_workers:
+            build_workers(worker_names, clean=not args.no_clean)
+        smoke_test_workers(worker_names)
         return
 
     build_bundle(clean=not args.no_clean)
+    smoke_test_embedded_workers(worker_names)
     smoke_test_bundle()
     package_bundle()
 

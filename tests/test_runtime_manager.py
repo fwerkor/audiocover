@@ -83,6 +83,31 @@ def test_frozen_worker_protocol_when_runtime_dir_is_supplied(tmp_path: Path) -> 
     assert cap.supports("train")
 
 
+
+
+def test_frozen_runtime_uses_current_executable_for_embedded_workers(monkeypatch) -> None:
+    import audiocover.runtime as runtime
+
+    monkeypatch.setattr(runtime.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(runtime.sys, "executable", "/opt/AudioCover/AudioCover")
+
+    command = runtime._source_command("simple-timbre")
+
+    assert command == ("/opt/AudioCover/AudioCover", "--audiocover-worker", "simple-timbre")
+
+
+def test_frozen_runtime_env_forces_cpu_only(monkeypatch) -> None:
+    import audiocover.runtime as runtime
+
+    monkeypatch.setattr(runtime.sys, "frozen", True, raising=False)
+    monkeypatch.delenv("AUDIOCOVER_BINARY_CPU_ONLY", raising=False)
+
+    env = runtime._prepare_env()
+
+    assert env["AUDIOCOVER_BINARY_CPU_ONLY"] == "1"
+    assert env["CUDA_VISIBLE_DEVICES"] == ""
+
+
 def test_runtime_manager_streams_worker_logs(tmp_path: Path) -> None:
     runtime_root = tmp_path / "backend-runtimes"
     _write_fake_runtime(
@@ -414,9 +439,24 @@ class _FakeTorchDevice:
         return self.value
 
 
+
+
+def test_so_vits_worker_binary_cpu_only_disables_cuda_selection(monkeypatch) -> None:
+    from audiocover.workers import so_vits_svc_worker
+
+    monkeypatch.setenv("AUDIOCOVER_BINARY_CPU_ONLY", "1")
+
+    device, reason = so_vits_svc_worker._resolve_torch_device("cuda")
+
+    assert device == "cpu"
+    assert reason is not None
+    assert "release binaries are CPU-only" in reason
+
+
 def test_so_vits_worker_cuda_first_device_falls_back_to_cpu_without_cuda_build(monkeypatch) -> None:
     from audiocover.workers import so_vits_svc_worker
 
+    monkeypatch.delenv("AUDIOCOVER_BINARY_CPU_ONLY", raising=False)
     fake_torch = SimpleNamespace(
         version=SimpleNamespace(cuda=None),
         cuda=SimpleNamespace(
@@ -440,6 +480,7 @@ def test_so_vits_worker_cuda_first_device_falls_back_to_cpu_without_cuda_build(m
 def test_so_vits_worker_cuda_first_device_uses_cuda_when_probe_succeeds(monkeypatch) -> None:
     from audiocover.workers import so_vits_svc_worker
 
+    monkeypatch.delenv("AUDIOCOVER_BINARY_CPU_ONLY", raising=False)
     fake_torch = SimpleNamespace(
         version=SimpleNamespace(cuda="12.1"),
         cuda=SimpleNamespace(

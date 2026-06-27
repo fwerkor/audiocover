@@ -36,33 +36,44 @@ def test_so_vits_backend_extra_declares_decoder_dependencies() -> None:
         assert dependency in normalized
 
 
-def test_release_matrix_installs_so_vits_decoder_dependencies() -> None:
+def test_release_builds_cpu_only_single_file_desktop_artifacts() -> None:
     workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
 
-    for dependency in (
-        "so-vits-svc-fork==4.2.30",
-        "torch>=2.8.0",
-        "torchaudio>=2.8.0",
-        "tensorboard>=2.16.0",
-        "scikit-learn>=1.4.0",
-        "tqdm-joblib>=0.0.4",
+    assert "Build CPU-only single-file desktop binary" in workflow
+    assert "https://download.pytorch.org/whl/cpu" in workflow
+    assert "torch==2.8.0+cpu" in workflow
+    assert "torchaudio==2.8.0+cpu" in workflow
+    assert "build-runtime-pack" not in workflow
+    assert "runtime-${{ matrix.backend }}" not in workflow
+    assert "audiocover-backend-runtimes" not in workflow
+    assert "https://download.pytorch.org/whl/cu" not in workflow
+    assert "torch==2.11.0+cu130" not in workflow
+    assert "torchaudio==2.11.0+cu130" not in workflow
+
+
+def test_pyinstaller_spec_is_onefile_and_embeds_workers_and_assets() -> None:
+    spec = (ROOT / "packaging" / "audiocover-gui.spec").read_text(encoding="utf-8")
+
+    assert "a.binaries" in spec
+    assert "a.datas" in spec
+    assert "BUNDLE_ASSETS_DIR" in spec
+    assert "backend-runtimes" not in spec
+    assert "COLLECT(" not in spec
+    for module in (
+        "audiocover.workers.simple_timbre_worker",
+        "audiocover.workers.demucs_separator_worker",
+        "audiocover.workers.so_vits_svc_worker",
     ):
-        assert workflow.count(dependency) >= 4
+        assert module in spec
 
 
-def test_windows_so_vits_runtime_uses_cuda_130_pytorch_wheels() -> None:
-    workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
-
-    assert "https://download.pytorch.org/whl/cu130" in workflow
-    assert "torch==2.11.0+cu130" in workflow
-    assert "torchaudio==2.11.0+cu130" in workflow
-    assert "torch==2.5.1+cu121" not in workflow
-    assert "torchaudio==2.5.1+cu121" not in workflow
-
-
-def test_build_script_self_tests_so_vits_runtime_without_torchcodec() -> None:
+def test_build_script_prepares_bundle_assets_and_single_binary_archive() -> None:
     build_desktop = _build_desktop_module()
 
+    assert build_desktop.BUNDLE_ASSETS_DIR.name == "audiocover-bundle-assets"
+    assert hasattr(build_desktop, "install_bundle_assets")
+    assert hasattr(build_desktop, "smoke_test_embedded_workers")
+    assert build_desktop.WORKER_SETS["all"] == tuple(build_desktop.WORKERS)
     assert "torchcodec" not in build_desktop.WORKER_COLLECTS["so-vits-svc"]
     assert "tensorboard" in build_desktop.WORKER_COLLECTS["so-vits-svc"]
     assert build_desktop.RUNTIME_SELF_TESTS["so-vits-svc"] == "self_test"
@@ -79,6 +90,7 @@ def test_so_vits_runtime_pack_includes_hubert_import_chain() -> None:
     assert "torch._inductor" not in build_desktop.WORKER_EXCLUDES
     assert "torch.utils.tensorboard" not in build_desktop.WORKER_EXCLUDES
 
+
 def test_so_vits_runtime_assets_pin_huggingface_revisions() -> None:
     build_desktop = _build_desktop_module()
 
@@ -89,4 +101,3 @@ def test_so_vits_runtime_assets_pin_huggingface_revisions() -> None:
     assert all(build_desktop.SOVITS_INIT_REVISION in url for url in urls[2:])
     assert len(build_desktop.CONTENTVEC_REVISION) == 40
     assert len(build_desktop.SOVITS_INIT_REVISION) == 40
-

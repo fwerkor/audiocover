@@ -208,7 +208,25 @@ class AudioCoverGui:
         self.root.mainloop()
 
 
+def _run_embedded_worker() -> bool:
+    if len(sys.argv) < 3 or sys.argv[1] != "--audiocover-worker":
+        return False
+    worker_name = sys.argv[2]
+    if worker_name == "simple-timbre":
+        from audiocover.workers.simple_timbre_worker import main as worker_main
+    elif worker_name == "demucs-separator":
+        from audiocover.workers.demucs_separator_worker import main as worker_main
+    elif worker_name == "so-vits-svc":
+        from audiocover.workers.so_vits_svc_worker import main as worker_main
+    else:
+        raise SystemExit(f"unknown embedded worker: {worker_name}")
+    worker_main()
+    return True
+
+
 def main() -> None:
+    if _run_embedded_worker():
+        return
     if "--smoke-test" in sys.argv:
         return
     AudioCoverGui().run()

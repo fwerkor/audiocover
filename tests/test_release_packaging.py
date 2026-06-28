@@ -103,11 +103,16 @@ def test_build_script_resolves_onedir_executable(monkeypatch, tmp_path) -> None:
     assert build_desktop._bundle_executable() == executable
 
 
-def test_build_script_prepares_bundle_assets_and_desktop_archive() -> None:
+def test_build_script_prepares_bundle_assets_and_desktop_archive(tmp_path) -> None:
     build_desktop = _build_desktop_module()
 
     assert build_desktop.BUNDLE_ASSETS_DIR.name == "audiocover-bundle-assets"
     assert hasattr(build_desktop, "install_bundle_assets")
+    small_artifact = tmp_path / "artifact.zip"
+    small_artifact.write_bytes(b"content")
+    assert build_desktop._split_large_artifact(small_artifact) == [small_artifact]
+    assert not any(path.name.endswith(".sha256") for path in tmp_path.iterdir())
+
     assert hasattr(build_desktop, "smoke_test_embedded_workers")
     assert build_desktop.WORKER_SETS["all"] == tuple(build_desktop.WORKERS)
     assert "torchcodec" not in build_desktop.WORKER_COLLECTS["so-vits-svc"]

@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import http.client
 import json
 import os
@@ -413,19 +412,9 @@ def package_bundle() -> Path:
     return outputs[0]
 
 
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
 def _split_large_artifact(artifact: Path, *, max_part_bytes: int = 1900 * 1024 * 1024) -> list[Path]:
     if artifact.stat().st_size <= max_part_bytes:
-        checksum = artifact.with_name(artifact.name + ".sha256")
-        checksum.write_text(f"{_sha256_file(artifact)}  {artifact.name}\n", encoding="utf-8")
-        return [artifact, checksum]
+        return [artifact]
 
     parts: list[Path] = []
     index = 1
@@ -438,11 +427,8 @@ def _split_large_artifact(artifact: Path, *, max_part_bytes: int = 1900 * 1024 *
             part.write_bytes(chunk)
             parts.append(part)
             index += 1
-    checksum = artifact.with_name(artifact.name + ".sha256")
-    checksum.write_text(f"{_sha256_file(artifact)}  {artifact.name}\n", encoding="utf-8")
-    parts.append(checksum)
     artifact.unlink()
-    print(f"Split large artifact into {len(parts) - 1} parts: {artifact.name}", flush=True)
+    print(f"Split large artifact into {len(parts)} parts: {artifact.name}", flush=True)
     return parts
 
 

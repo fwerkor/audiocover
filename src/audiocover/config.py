@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import sys
 from pathlib import Path
 from typing import Any, Literal
 
@@ -170,12 +171,26 @@ class ModelPackage(BaseModel):
         return path
 
 
+def application_root() -> Path:
+    """Return the root containing bundled data files such as configs/.
+
+    In source checkouts this is the project root. In PyInstaller one-file
+    builds, data files are extracted under sys._MEIPASS while module __file__
+    lives under an embedded package path, so resolving from __file__ would miss
+    bundled configs on Windows and other frozen platforms.
+    """
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        return Path(meipass)
+    return Path(__file__).resolve().parents[2]
+
+
 def default_config_path() -> Path:
-    return Path(__file__).resolve().parents[2] / "configs" / "high_quality.yaml"
+    return application_root() / "configs" / "high_quality.yaml"
 
 
 def default_training_config_path() -> Path:
-    return Path(__file__).resolve().parents[2] / "configs" / "training_simple.yaml"
+    return application_root() / "configs" / "training_simple.yaml"
 
 
 

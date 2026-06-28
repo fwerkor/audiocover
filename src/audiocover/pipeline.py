@@ -101,13 +101,22 @@ def render_cover(
     if output_dir.exists() and any(output_dir.iterdir()) and not config.overwrite:
         raise FileExistsError(f"output directory is not empty: {output_dir}")
     output_dir.mkdir(parents=True, exist_ok=True)
+    if log:
+        log(f"output folder: {output_dir}")
+        log(f"loading model package: {model_package_path}")
 
     package = ModelPackage.from_yaml(model_package_path)
+    if log:
+        log(f"normalizing input song: {input_song}")
     normalized = convert_to_wav(input_song, output_dir / "input" / "input.wav", config.mix.sample_rate)
-    stems = separate(normalized, output_dir / "stems", config.separator)
+    if log:
+        log("separating vocals and instrumental")
+    stems = separate(normalized, output_dir / "stems", config.separator, log=log)
     reports = output_dir / "reports"
     reports.mkdir(parents=True, exist_ok=True)
     conversion_cfg = resolve_conversion_config(package.merged_conversion(config.conversion))
+    if log:
+        log(f"selected conversion mode: backend={conversion_cfg.backend}, runtime={conversion_cfg.runtime_backend or 'auto'}")
     conversion_cfg, pitch_report = apply_auto_pitch_adaptation(
         stems.vocals,
         package,
@@ -116,9 +125,15 @@ def render_cover(
         sample_rate=config.mix.sample_rate,
         log=log,
     )
+    if log:
+        log("converting vocal")
     converted = convert_vocal(stems.vocals, output_dir / "converted", conversion_cfg, output_dir, log=log)
+    if log:
+        log("polishing and mixing final cover")
     polished, final = polish_and_mix(stems.instrumental, converted.vocal, output_dir / "mix", config.mix)
 
+    if log:
+        log("running output quality checks")
     qc = {
         "input": analyze_audio(normalized, config.qc),
         "vocals": analyze_audio(stems.vocals, config.qc),
@@ -150,4 +165,6 @@ def render_cover(
     }
     manifest_path = output_dir / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+    if log:
+        log(f"final mix written: {final}")
     return manifest

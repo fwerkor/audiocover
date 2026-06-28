@@ -176,21 +176,36 @@ class AudioCoverGui:
     def _start_render(self) -> None:
         if not self.render_consent.get():
             messagebox.showerror("Consent required", "Confirm that you have permission to use the song and model.")
+            self.log_queue.put("[render] not started: permission confirmation is required")
             return
-        cfg = RenderConfig.from_yaml(default_config_path())
-        out_dir = self._dedicated_output_dir(Path(self.render_out.get()))
-        if out_dir != Path(self.render_out.get()):
-            self.log_queue.put(f"[render] output folder exists; using {out_dir}")
-        self.worker.run(
-            "render",
-            render_cover,
-            Path(self.song_path.get()),
-            Path(self.model_yaml.get()),
-            out_dir,
-            config=cfg,
-            consent=True,
-            log=lambda message: self._log_with_scope("render", message),
-        )
+        self.log_queue.put("[render] button clicked")
+        try:
+            song_path = Path(self.song_path.get())
+            model_yaml = Path(self.model_yaml.get())
+            if not song_path.is_file():
+                raise FileNotFoundError(f"song file was not found: {song_path}")
+            if not model_yaml.is_file():
+                raise FileNotFoundError(f"model package model.yaml was not found: {model_yaml}")
+            config_path = default_config_path()
+            self.log_queue.put(f"[render] loading preset: {config_path}")
+            cfg = RenderConfig.from_yaml(config_path)
+            requested_out = Path(self.render_out.get())
+            out_dir = self._dedicated_output_dir(requested_out)
+            if out_dir != requested_out:
+                self.log_queue.put(f"[render] output folder exists; using {out_dir}")
+            self.worker.run(
+                "render",
+                render_cover,
+                song_path,
+                model_yaml,
+                out_dir,
+                config=cfg,
+                consent=True,
+                log=lambda message: self._log_with_scope("render", message),
+            )
+        except Exception:
+            self.log_queue.put("[render] failed before worker startup")
+            self.log_queue.put(traceback.format_exc())
 
     def _poll_logs(self) -> None:
         while True:

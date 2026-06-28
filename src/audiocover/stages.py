@@ -42,7 +42,7 @@ class Converted:
     vocal: Path
 
 
-def separate(input_wav: Path, out_dir: Path, cfg: SeparatorConfig) -> Stems:
+def separate(input_wav: Path, out_dir: Path, cfg: SeparatorConfig, *, log: Callable[[str], None] | None = None) -> Stems:
     out_dir.mkdir(parents=True, exist_ok=True)
     vocals = out_dir / "vocals.wav"
     instrumental = out_dir / "instrumental.wav"
@@ -51,6 +51,8 @@ def separate(input_wav: Path, out_dir: Path, cfg: SeparatorConfig) -> Stems:
         manager = BackendRuntimeManager()
         runtime_backend = manager.select_separator_backend()
         if runtime_backend:
+            if log:
+                log(f"selected separator backend: {runtime_backend}")
             data = cfg.model_dump()
             if data.get("device") == "auto":
                 data["device"] = "cpu"
@@ -64,6 +66,7 @@ def separate(input_wav: Path, out_dir: Path, cfg: SeparatorConfig) -> Stems:
                     "instrumental": str(instrumental),
                     **data,
                 },
+                log=log,
             )
             return Stems(Path(result["vocals"]), Path(result["instrumental"]))
         if cfg.backend == "managed":
@@ -72,6 +75,8 @@ def separate(input_wav: Path, out_dir: Path, cfg: SeparatorConfig) -> Stems:
     cfg = resolve_separator_config(cfg)
 
     if cfg.backend == "none":
+        if log:
+            log("separator disabled; using input audio for both stems")
         vocals.write_bytes(input_wav.read_bytes())
         instrumental.write_bytes(input_wav.read_bytes())
         return Stems(vocals, instrumental)
@@ -79,6 +84,8 @@ def separate(input_wav: Path, out_dir: Path, cfg: SeparatorConfig) -> Stems:
     if cfg.backend == "external":
         if not cfg.command_template:
             raise ValueError("external separator requires command_template")
+        if log:
+            log("running external separator command")
         run_template(cfg.command_template, input=input_wav, vocals=vocals, instrumental=instrumental, outdir=out_dir)
         return Stems(vocals, instrumental)
 
@@ -104,6 +111,8 @@ def separate(input_wav: Path, out_dir: Path, cfg: SeparatorConfig) -> Stems:
     if cfg.segment:
         cmd.insert(-1, str(cfg.segment))
         cmd.insert(-2, "--segment")
+    if log:
+        log(f"running demucs separator on {cfg.device}")
     cmd.extend(cfg.extra_args)
 
     process = run_hidden(cmd, text=True, capture_output=True)

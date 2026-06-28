@@ -174,10 +174,10 @@ class ModelPackage(BaseModel):
 def application_root() -> Path:
     """Return the root containing bundled data files such as configs/.
 
-    In source checkouts this is the project root. In PyInstaller one-file
-    builds, data files are extracted under sys._MEIPASS while module __file__
-    lives under an embedded package path, so resolving from __file__ would miss
-    bundled configs on Windows and other frozen platforms.
+    In source checkouts this is the project root. In PyInstaller builds, data
+    files may live under sys._MEIPASS or beside the frozen executable while
+    module __file__ lives under an embedded package path, so resolving from
+    __file__ would miss bundled configs on frozen platforms.
     """
     meipass = getattr(sys, "_MEIPASS", None)
     if meipass:

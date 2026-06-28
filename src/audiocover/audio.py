@@ -41,9 +41,28 @@ def run_command(args: list[str], *, log_file: Path | None = None) -> None:
         raise RuntimeError(process.stderr[-4000:])
 
 
-def require_ffmpeg() -> None:
-    if shutil.which("ffmpeg") is None:
-        raise RuntimeError("ffmpeg was not found in PATH")
+def ffmpeg_executable() -> str | None:
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg:
+        return ffmpeg
+    try:
+        import imageio_ffmpeg
+
+        bundled = imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:
+        bundled = None
+    if bundled and Path(bundled).is_file():
+        return str(bundled)
+    return None
+
+
+def require_ffmpeg() -> str:
+    ffmpeg = ffmpeg_executable()
+    if ffmpeg is None:
+        raise RuntimeError(
+            "ffmpeg was not found. Reinstall the AudioCover package or install ffmpeg and make sure it is in PATH."
+        )
+    return ffmpeg
 
 
 def convert_to_wav(src: Path, dst: Path, sample_rate: int = 48000, channels: int = 2) -> Path:
@@ -55,11 +74,11 @@ def convert_to_wav(src: Path, dst: Path, sample_rate: int = 48000, channels: int
         except Exception:
             pass
 
-    require_ffmpeg()
+    ffmpeg = require_ffmpeg()
     dst.parent.mkdir(parents=True, exist_ok=True)
     run_command(
         [
-            "ffmpeg",
+            ffmpeg,
             "-y",
             "-hide_banner",
             "-loglevel",

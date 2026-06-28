@@ -6,7 +6,7 @@ AudioCover is a desktop GUI and CLI for local audio-cover workflows. It prepares
 
 - Desktop GUI for training data, model package, song input, output folder, and rights confirmation.
 - CPU-only release binaries for Windows, Linux, and macOS.
-- Single-binary desktop delivery: no external `_internal` folder and no separate `backend-runtimes` pack for normal desktop use.
+- Single archive per platform with all backend code and required runtime assets included.
 - Automatic backend selection without a user-facing backend picker.
 - Automatic octave-level pitch range adaptation from the trained voice profile.
 - CLI commands for dataset preparation, training, rendering, quality checks, and diagnostics.
@@ -14,25 +14,24 @@ AudioCover is a desktop GUI and CLI for local audio-cover workflows. It prepares
 
 ## Download desktop builds
 
-Download the single binary for your platform from the release page.
+Download the archive for your platform from the release page, extract it, and run the executable inside the `AudioCover` folder.
 
 | Platform | Artifact | Notes |
 | --- | --- | --- |
-| Windows x64 | `audiocover-windows-x64.exe` | CPU-only |
-| Linux x64 | `audiocover-linux-x64` | CPU-only; make executable before running |
-| Linux arm64 | `audiocover-linux-arm64` | CPU-only; make executable before running |
-| macOS arm64 | `audiocover-macos-arm64` | CPU-only; make executable before running |
+| Windows x64 | `audiocover-windows-x64.zip` | CPU-only |
+| Linux x64 | `audiocover-linux-x64.tar.gz` | CPU-only |
+| Linux arm64 | `audiocover-linux-arm64.tar.gz` | CPU-only |
+| macOS arm64 | `audiocover-macos-arm64.tar.gz` | CPU-only |
 
-The Python wheel and source archive are for package/developer use. Desktop users normally only need the platform binary.
+The Python wheel and source archive are for package/developer use. Desktop users normally only need the platform archive.
 
 ## Run desktop builds
 
 ### Windows x64
 
 ```powershell
-mkdir C:\AudioCover
-Move-Item .\audiocover-windows-x64.exe C:\AudioCover\AudioCover.exe
-C:\AudioCover\AudioCover.exe
+Expand-Archive .\audiocover-windows-x64.zip C:\AudioCover
+C:\AudioCover\AudioCover\AudioCover.exe
 ```
 
 If SmartScreen appears, choose **More info** and **Run anyway**.
@@ -41,39 +40,36 @@ If SmartScreen appears, choose **More info** and **Run anyway**.
 
 ```bash
 mkdir -p ~/AudioCover
-cp ~/Downloads/audiocover-linux-x64 ~/AudioCover/AudioCover
-chmod +x ~/AudioCover/AudioCover
-~/AudioCover/AudioCover
+tar -xzf ~/Downloads/audiocover-linux-x64.tar.gz -C ~/AudioCover
+~/AudioCover/AudioCover/AudioCover
 ```
 
-For Linux arm64, replace `audiocover-linux-x64` with `audiocover-linux-arm64`.
+For Linux arm64, replace `audiocover-linux-x64.tar.gz` with `audiocover-linux-arm64.tar.gz`.
 
 ### macOS arm64
 
 ```bash
 mkdir -p ~/AudioCover
-cp ~/Downloads/audiocover-macos-arm64 ~/AudioCover/AudioCover
-chmod +x ~/AudioCover/AudioCover
-~/AudioCover/AudioCover
+tar -xzf ~/Downloads/audiocover-macos-arm64.tar.gz -C ~/AudioCover
+~/AudioCover/AudioCover/AudioCover
 ```
 
 If macOS Gatekeeper blocks the binary, open **System Settings → Privacy & Security** and allow it, or run:
 
 ```bash
-xattr -d com.apple.quarantine ~/AudioCover/AudioCover
-~/AudioCover/AudioCover
+xattr -dr com.apple.quarantine ~/AudioCover/AudioCover
+~/AudioCover/AudioCover/AudioCover
 ```
 
-## Single-file behavior
+## Desktop bundle behavior
 
-Release binaries are PyInstaller one-file executables. Backend code and pinned So-VITS-SVC model assets are embedded in the binary. At launch, the executable extracts its runtime into the operating system temporary directory. Embedded worker subprocesses are launched through the same executable and reuse the extracted application home while the parent process is alive.
+Release artifacts are compressed archives containing a PyInstaller onedir app. Backend code, the bundled FFmpeg executable, and pinned So-VITS-SVC model assets are included in the extracted `AudioCover` folder.
 
 Practical implications:
 
-- Keep enough free space in the system temporary directory. Several GB of temporary space is recommended for training or rendering.
-- First launch can be slower because native libraries and model assets need to be unpacked.
-- Antivirus or endpoint protection can slow the first launch on Windows.
-- Do not delete the temporary extraction directory while AudioCover is running.
+- Extract the archive before running the executable; do not run files directly from inside the compressed archive.
+- Keep the extracted folder intact because native libraries and model assets are loaded from that folder.
+- Startup is faster than a PyInstaller one-file build because the app no longer unpacks a multi-GB runtime to `%TEMP%` on every launch.
 - Release binaries force CPU execution. CUDA/MPS GPU execution is intentionally only supported from source.
 
 ## GUI workflow
@@ -230,7 +226,7 @@ By default, source runs select the best available PyTorch device. To force CPU o
 
 ## Build release-style binaries locally
 
-CPU-only single-file build:
+CPU-only desktop archive build:
 
 ```bash
 python -m pip install --index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple torch torchaudio
@@ -238,7 +234,7 @@ python -m pip install -e ".[build,demucs-backend,so-vits-svc-backend]"
 python scripts/build_desktop.py
 ```
 
-The output is written to `dist/audiocover-<platform>` or `dist/audiocover-<platform>.exe`.
+The output is written to `dist/audiocover-<platform>.zip` on Windows or `dist/audiocover-<platform>.tar.gz` on Linux/macOS.
 
 ## Responsible use
 

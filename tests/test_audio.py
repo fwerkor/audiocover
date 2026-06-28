@@ -1,5 +1,9 @@
+import sys
+import types
+
 import numpy as np
 
+from audiocover import audio
 from audiocover.audio import limiter, match_channels, match_length, normalize_lufs, peak_dbfs
 
 
@@ -24,3 +28,16 @@ def test_normalize_lufs_finite() -> None:
     y = normalize_lufs(x, sr, -16.0)
     assert np.all(np.isfinite(y))
     assert peak_dbfs(y) <= -0.9
+
+
+def test_require_ffmpeg_uses_imageio_fallback(monkeypatch, tmp_path) -> None:
+    fake_ffmpeg = tmp_path / "ffmpeg"
+    fake_ffmpeg.write_text("", encoding="utf-8")
+    monkeypatch.setattr(audio.shutil, "which", lambda _name: None)
+    monkeypatch.setitem(
+        sys.modules,
+        "imageio_ffmpeg",
+        types.SimpleNamespace(get_ffmpeg_exe=lambda: str(fake_ffmpeg)),
+    )
+
+    assert audio.require_ffmpeg() == str(fake_ffmpeg)

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "audiocover"
-version = "0.9.1"
+version = "0.9.2"
 description = "Desktop GUI and CLI for training target profiles and rendering audio covers."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -27,6 +27,7 @@ dependencies = [
   "numpy>=1.26.0",
   "scipy>=1.11.0",
   "soundfile>=0.12.1",
+  "imageio-ffmpeg>=0.5.1",
   "pyloudnorm>=0.1.1",
 ]
 

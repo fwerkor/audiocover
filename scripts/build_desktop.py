@@ -372,25 +372,45 @@ def build_bundle(clean: bool) -> None:
     _run(["pyinstaller", "--log-level", "ERROR", str(SPEC_PATH), "--clean", "--noconfirm"])
     executable = _bundle_executable()
     if not executable.exists():
-        raise FileNotFoundError(f"PyInstaller did not create a one-file executable at {executable}")
+        raise FileNotFoundError(f"PyInstaller did not create the desktop executable at {executable}")
 
 
 def package_bundle() -> Path:
     executable = _bundle_executable()
     if not executable.exists():
         raise FileNotFoundError(f"Desktop executable was not found: {executable}")
-    suffix = ".exe" if _normalize_system(platform.system()) == "windows" else ""
+
+    system = _normalize_system(platform.system())
+    bundle_root = APP_DIR if APP_DIR.exists() else MAC_APP_DIR if MAC_APP_DIR.exists() else executable
+    if bundle_root.is_dir():
+        artifact_base = DIST_DIR / f"audiocover-{_platform_name()}"
+        archive_format = "zip" if system == "windows" else "gztar"
+        artifact = Path(
+            shutil.make_archive(str(artifact_base), archive_format, root_dir=DIST_DIR, base_dir=bundle_root.name)
+        )
+        outputs = _split_large_artifact(artifact)
+        for item in outputs:
+            print(f"Built {item.relative_to(ROOT)}", flush=True)
+        github_output = os.environ.get("GITHUB_OUTPUT")
+        if github_output:
+            with open(github_output, "a", encoding="utf-8") as handle:
+                handle.write(f"artifact={outputs[0].as_posix()}\n")
+        return outputs[0]
+
+    suffix = ".exe" if system == "windows" else ""
     artifact = DIST_DIR / f"audiocover-{_platform_name()}{suffix}"
     if executable.resolve() != artifact.resolve():
         shutil.copy2(executable, artifact)
-    if _normalize_system(platform.system()) != "windows":
+    if system != "windows":
         artifact.chmod(artifact.stat().st_mode | 0o755)
-    print(f"Built {artifact.relative_to(ROOT)}", flush=True)
+    outputs = _split_large_artifact(artifact)
+    for item in outputs:
+        print(f"Built {item.relative_to(ROOT)}", flush=True)
     github_output = os.environ.get("GITHUB_OUTPUT")
     if github_output:
         with open(github_output, "a", encoding="utf-8") as handle:
-            handle.write(f"artifact={artifact.as_posix()}\n")
-    return artifact
+            handle.write(f"artifact={outputs[0].as_posix()}\n")
+    return outputs[0]
 
 
 def _sha256_file(path: Path) -> str:

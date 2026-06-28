@@ -7,10 +7,6 @@ import traceback
 from datetime import datetime
 from pathlib import Path
 
-from audiocover.config import RenderConfig, TrainingConfig, default_config_path
-from audiocover.pipeline import render_cover
-from audiocover.training import train_model
-
 
 def _load_tk() -> None:
     global BooleanVar, ScrolledText, StringVar, Tk, filedialog, messagebox, ttk
@@ -155,6 +151,9 @@ class AudioCoverGui:
         if not self.train_consent.get():
             messagebox.showerror("Consent required", "Confirm that you own or are authorized to use the recordings.")
             return
+        from audiocover.config import TrainingConfig
+        from audiocover.training import train_model
+
         cfg = TrainingConfig()
         self.worker.run(
             "training",
@@ -186,6 +185,9 @@ class AudioCoverGui:
                 raise FileNotFoundError(f"song file was not found: {song_path}")
             if not model_yaml.is_file():
                 raise FileNotFoundError(f"model package model.yaml was not found: {model_yaml}")
+            from audiocover.config import RenderConfig, default_config_path
+            from audiocover.pipeline import render_cover
+
             config_path = default_config_path()
             self.log_queue.put(f"[render] loading preset: {config_path}")
             cfg = RenderConfig.from_yaml(config_path)
@@ -243,6 +245,8 @@ def main() -> None:
     if _run_embedded_worker():
         return
     if "--smoke-test" in sys.argv:
+        from audiocover.config import RenderConfig, default_config_path
+
         RenderConfig.from_yaml(default_config_path())
         return
     AudioCoverGui().run()

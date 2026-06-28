@@ -36,10 +36,10 @@ def test_so_vits_backend_extra_declares_decoder_dependencies() -> None:
         assert dependency in normalized
 
 
-def test_release_builds_cpu_only_single_file_desktop_artifacts() -> None:
+def test_release_builds_cpu_only_fast_desktop_bundle_artifacts() -> None:
     workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
 
-    assert "Build CPU-only single-file desktop binary" in workflow
+    assert "Build CPU-only fast desktop bundle" in workflow
     assert "https://download.pytorch.org/whl/cpu" in workflow
     assert "torch==2.8.0+cpu" in workflow
     assert "torchaudio==2.8.0+cpu" in workflow
@@ -62,14 +62,16 @@ def test_release_workflow_uses_current_artifact_and_release_actions() -> None:
     assert "actions/download-artifact@v4" not in workflow
     assert "softprops/action-gh-release@v2" not in workflow
 
-def test_pyinstaller_spec_is_onefile_and_embeds_workers_and_assets() -> None:
+def test_pyinstaller_spec_is_onedir_and_embeds_workers_and_assets() -> None:
     spec = (ROOT / "packaging" / "audiocover-gui.spec").read_text(encoding="utf-8")
 
     assert "a.binaries" in spec
     assert "a.datas" in spec
     assert "BUNDLE_ASSETS_DIR" in spec
     assert "backend-runtimes" not in spec
-    assert "COLLECT(" not in spec
+    assert "exclude_binaries=True" in spec
+    assert "COLLECT(" in spec
+    assert "imageio_ffmpeg" in spec
     assert "_FILTERED_HIDDEN_IMPORT_PREFIXES" in spec
     assert "torch.distributed._shard.checkpoint" in spec
     for module in (
@@ -80,7 +82,7 @@ def test_pyinstaller_spec_is_onefile_and_embeds_workers_and_assets() -> None:
         assert module in spec
 
 
-def test_build_script_prepares_bundle_assets_and_single_binary_archive() -> None:
+def test_build_script_prepares_bundle_assets_and_desktop_archive() -> None:
     build_desktop = _build_desktop_module()
 
     assert build_desktop.BUNDLE_ASSETS_DIR.name == "audiocover-bundle-assets"

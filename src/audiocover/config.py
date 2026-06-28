@@ -33,7 +33,7 @@ class ConversionConfig(BaseModel):
     cluster_model_path: Path | None = None
     simple_profile_path: Path | None = None
     speaker: str | None = None
-    f0_method: str = "rmvpe"
+    f0_method: str = "harvest"
     transpose: int = Field(default=0, ge=-24, le=24)
     protect: float = Field(default=0.33, ge=0.0, le=1.0)
     index_rate: float = Field(default=0.75, ge=0.0, le=1.0)
@@ -49,7 +49,7 @@ class TrainingConfig(BaseModel):
     segment_seconds: float = Field(default=12.0, ge=2.0, le=30.0)
     epochs: int = Field(default=200, ge=1)
     batch_size: int = Field(default=8, ge=1)
-    f0_method: str = "rmvpe"
+    f0_method: str = "harvest"
     commands: list[str] = Field(default_factory=list)
 
 
@@ -107,7 +107,7 @@ class ModelPackage(BaseModel):
     voice_profile_path: Path | None = None
     speaker: str | None = None
     transpose: int = 0
-    f0_method: str = "rmvpe"
+    f0_method: str = "harvest"
     created_by: str = "audiocover"
     notes: str | None = None
 

@@ -9,7 +9,7 @@ conversion:
   backend: auto
   pitch_shift_mode: auto
   command_template: null
-  f0_method: rmvpe
+  f0_method: harvest
   transpose: 0
   protect: 0.33
   index_rate: 0.75

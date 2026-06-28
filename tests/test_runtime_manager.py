@@ -515,6 +515,26 @@ def test_so_vits_worker_auto_training_fails_on_cuda_kernel_failure() -> None:
     )
 
 
+def test_so_vits_worker_forces_44k_training_preset() -> None:
+    from audiocover.workers import so_vits_svc_worker
+
+    sample_rate, note = so_vits_svc_worker._resolve_so_vits_sample_rate(48000)
+
+    assert sample_rate == 44100
+    assert note is not None
+    assert "44k preset" in note
+
+
+def test_so_vits_worker_resolves_unsupported_rmvpe_to_harvest() -> None:
+    from audiocover.workers import so_vits_svc_worker
+
+    method, note = so_vits_svc_worker._resolve_so_vits_f0_method("rmvpe")
+
+    assert method == "harvest"
+    assert note is not None
+    assert "does not support rmvpe" in note
+
+
 def test_so_vits_worker_lightning_trainer_overrides_cpu_defaults(monkeypatch) -> None:
     from audiocover.workers import so_vits_svc_worker
 

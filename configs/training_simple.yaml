@@ -1,7 +1,7 @@
 backend: auto
-sample_rate: 48000
+sample_rate: 44100
 segment_seconds: 12.0
 epochs: 200
 batch_size: 8
-f0_method: rmvpe
+f0_method: harvest
 commands: []

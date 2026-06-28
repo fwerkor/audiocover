@@ -41,6 +41,31 @@ _REQUIRED_IMPORTS: tuple[tuple[str, str], ...] = (
     ("joblib", "joblib"),
 )
 
+_SO_VITS_SVC_SAMPLE_RATE = 44100
+_SO_VITS_SVC_F0_METHODS = {"crepe", "crepe-tiny", "parselmouth", "dio", "harvest"}
+
+
+def _resolve_so_vits_sample_rate(requested: int | str | None) -> tuple[int, str | None]:
+    try:
+        requested_rate = int(requested) if requested is not None else _SO_VITS_SVC_SAMPLE_RATE
+    except (TypeError, ValueError):
+        requested_rate = _SO_VITS_SVC_SAMPLE_RATE
+    if requested_rate == _SO_VITS_SVC_SAMPLE_RATE:
+        return _SO_VITS_SVC_SAMPLE_RATE, None
+    return (
+        _SO_VITS_SVC_SAMPLE_RATE,
+        f"using the 44k preset; resampling training audio to {_SO_VITS_SVC_SAMPLE_RATE} Hz instead of {requested_rate} Hz",
+    )
+
+
+def _resolve_so_vits_f0_method(requested: object) -> tuple[str, str | None]:
+    value = str(requested or "").strip().lower()
+    if value in _SO_VITS_SVC_F0_METHODS:
+        return value, None
+    if value in {"rmvpe", "rmvpe+", "fcpe"}:
+        return "harvest", f"so-vits-svc-fork does not support {value}; using harvest f0 extraction"
+    return "dio", f"unsupported so-vits-svc f0 method {value or '<empty>'}; using dio"
+
 
 def _asset_dir(name: str, required_files: tuple[str, ...]) -> Path | None:
     candidates: list[Path] = []
@@ -651,10 +676,12 @@ def train(payload: dict[str, Any]) -> dict[str, Any]:
     filelist_dir = workdir / "filelists" / "44k"
     config_path = workdir / "configs" / "44k" / "config.json"
     model_dir = workdir / "logs" / "44k"
-    sample_rate = int(payload.get("sample_rate") or 44100)
-    f0_method = str(payload.get("f0_method") or "dio")
-    if f0_method not in {"crepe", "crepe-tiny", "parselmouth", "dio", "harvest"}:
-        f0_method = "dio"
+    sample_rate, sample_rate_note = _resolve_so_vits_sample_rate(payload.get("sample_rate"))
+    if sample_rate_note:
+        print(f"so-vits-svc: {sample_rate_note}", flush=True)
+    f0_method, f0_note = _resolve_so_vits_f0_method(payload.get("f0_method"))
+    if f0_note:
+        print(f"so-vits-svc: {f0_note}", flush=True)
 
     print("so-vits-svc: preprocessing audio", flush=True)
     pre_resample.callback(
@@ -678,6 +705,8 @@ def train(payload: dict[str, Any]) -> dict[str, Any]:
         train_cfg = data.setdefault("train", {})
         train_cfg["epochs"] = int(payload.get("epochs") or train_cfg.get("epochs") or 200)
         train_cfg["batch_size"] = int(payload.get("batch_size") or train_cfg.get("batch_size") or 8)
+        data_cfg = data.setdefault("data", {})
+        data_cfg["sampling_rate"] = sample_rate
         model_cfg = data.setdefault("model", {})
         model_cfg.pop("pretrained", None)
         config_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -738,9 +767,9 @@ def convert(payload: dict[str, Any]) -> dict[str, Any]:
         raise RuntimeError("So-VITS-SVC conversion requires model_path and config_path in the model package")
     output_path = Path(payload["output"])
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    f0_method = str(payload.get("f0_method") or "dio")
-    if f0_method not in {"crepe", "crepe-tiny", "parselmouth", "dio", "harvest"}:
-        f0_method = "dio"
+    f0_method, f0_note = _resolve_so_vits_f0_method(payload.get("f0_method"))
+    if f0_note:
+        print(f"so-vits-svc: {f0_note}", flush=True)
     infer(
         input_path=Path(payload["input"]),
         output_path=output_path,

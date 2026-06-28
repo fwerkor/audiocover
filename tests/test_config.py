@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import yaml
+
 from audiocover.config import ModelPackage, RenderConfig, TrainingConfig, default_config_path
 
 
@@ -7,6 +9,14 @@ def test_config_loads() -> None:
     cfg = RenderConfig.from_yaml(Path("configs/high_quality.yaml"))
     assert cfg.separator.model == "htdemucs_ft"
     assert cfg.mix.sample_rate == 48000
+
+
+def test_training_config_defaults_match_so_vits_preset() -> None:
+    data = yaml.safe_load(Path("configs/training_simple.yaml").read_text(encoding="utf-8"))
+    cfg = TrainingConfig.model_validate(data)
+
+    assert cfg.sample_rate == 44100
+    assert cfg.f0_method == "harvest"
 
 
 def test_default_config_path_uses_pyinstaller_meipass(monkeypatch, tmp_path: Path) -> None:

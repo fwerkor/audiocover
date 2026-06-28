@@ -108,6 +108,11 @@ def test_build_script_prepares_bundle_assets_and_desktop_archive(tmp_path) -> No
 
     assert build_desktop.BUNDLE_ASSETS_DIR.name == "audiocover-bundle-assets"
     assert hasattr(build_desktop, "install_bundle_assets")
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    version = project["project"]["version"]
+    assert build_desktop._project_version() == version
+    assert build_desktop._versioned_artifact_stem("windows-x64") == f"audiocover-{version}-windows-x64"
+
     small_artifact = tmp_path / "artifact.zip"
     small_artifact.write_bytes(b"content")
     assert build_desktop._split_large_artifact(small_artifact) == [small_artifact]

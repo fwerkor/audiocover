@@ -18,10 +18,10 @@ Download the archive for your platform from the release page, extract it, and ru
 
 | Platform | Artifact | Notes |
 | --- | --- | --- |
-| Windows x64 | `audiocover-windows-x64.zip` | CPU-only |
-| Linux x64 | `audiocover-linux-x64.tar.gz` | CPU-only |
-| Linux arm64 | `audiocover-linux-arm64.tar.gz` | CPU-only |
-| macOS arm64 | `audiocover-macos-arm64.tar.gz` | CPU-only |
+| Windows x64 | `audiocover-<version>-windows-x64.zip` | CPU-only |
+| Linux x64 | `audiocover-<version>-linux-x64.tar.gz` | CPU-only |
+| Linux arm64 | `audiocover-<version>-linux-arm64.tar.gz` | CPU-only |
+| macOS arm64 | `audiocover-<version>-macos-arm64.tar.gz` | CPU-only |
 
 The Python wheel and source archive are for package/developer use. Desktop users normally only need the platform archive.
 
@@ -30,7 +30,7 @@ The Python wheel and source archive are for package/developer use. Desktop users
 ### Windows x64
 
 ```powershell
-Expand-Archive .\audiocover-windows-x64.zip C:\AudioCover
+Expand-Archive .\audiocover-*-windows-x64.zip C:\AudioCover
 C:\AudioCover\AudioCover\AudioCover.exe
 ```
 
@@ -40,17 +40,17 @@ If SmartScreen appears, choose **More info** and **Run anyway**.
 
 ```bash
 mkdir -p ~/AudioCover
-tar -xzf ~/Downloads/audiocover-linux-x64.tar.gz -C ~/AudioCover
+tar -xzf ~/Downloads/audiocover-*-linux-x64.tar.gz -C ~/AudioCover
 ~/AudioCover/AudioCover/AudioCover
 ```
 
-For Linux arm64, replace `audiocover-linux-x64.tar.gz` with `audiocover-linux-arm64.tar.gz`.
+For Linux arm64, replace `audiocover-*-linux-x64.tar.gz` with `audiocover-*-linux-arm64.tar.gz`.
 
 ### macOS arm64
 
 ```bash
 mkdir -p ~/AudioCover
-tar -xzf ~/Downloads/audiocover-macos-arm64.tar.gz -C ~/AudioCover
+tar -xzf ~/Downloads/audiocover-*-macos-arm64.tar.gz -C ~/AudioCover
 ~/AudioCover/AudioCover/AudioCover
 ```
 
@@ -234,7 +234,7 @@ python -m pip install -e ".[build,demucs-backend,so-vits-svc-backend]"
 python scripts/build_desktop.py
 ```
 
-The output is written to `dist/audiocover-<platform>.zip` on Windows or `dist/audiocover-<platform>.tar.gz` on Linux/macOS.
+The output is written to `dist/audiocover-<version>-<platform>.zip` on Windows or `dist/audiocover-<version>-<platform>.tar.gz` on Linux/macOS.
 
 ## Responsible use
 

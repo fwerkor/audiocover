@@ -134,6 +134,17 @@ def _platform_name() -> str:
     return f"{_normalize_system(platform.system())}-{_normalize_machine(platform.machine())}"
 
 
+def _project_version() -> str:
+    for line in (ROOT / "pyproject.toml").read_text(encoding="utf-8").splitlines():
+        if line.startswith("version = "):
+            return line.split("\"", 2)[1]
+    raise RuntimeError("project version was not found in pyproject.toml")
+
+
+def _versioned_artifact_stem(*parts: str) -> str:
+    return "-".join(("audiocover", _project_version(), *parts))
+
+
 def _run(command: list[str], *, env: dict[str, str] | None = None) -> None:
     print("+", " ".join(command), flush=True)
     subprocess.run(command, cwd=ROOT, check=True, env=env)
@@ -382,7 +393,7 @@ def package_bundle() -> Path:
     system = _normalize_system(platform.system())
     bundle_root = APP_DIR if APP_DIR.exists() else MAC_APP_DIR if MAC_APP_DIR.exists() else executable
     if bundle_root.is_dir():
-        artifact_base = DIST_DIR / f"audiocover-{_platform_name()}"
+        artifact_base = DIST_DIR / _versioned_artifact_stem(_platform_name())
         archive_format = "zip" if system == "windows" else "gztar"
         artifact = Path(
             shutil.make_archive(str(artifact_base), archive_format, root_dir=DIST_DIR, base_dir=bundle_root.name)
@@ -397,7 +408,7 @@ def package_bundle() -> Path:
         return outputs[0]
 
     suffix = ".exe" if system == "windows" else ""
-    artifact = DIST_DIR / f"audiocover-{_platform_name()}{suffix}"
+    artifact = DIST_DIR / f"{_versioned_artifact_stem(_platform_name())}{suffix}"
     if executable.resolve() != artifact.resolve():
         shutil.copy2(executable, artifact)
     if system != "windows":
@@ -436,7 +447,7 @@ def package_runtime_pack(pack_name: str, runtime_dir: Path = RUNTIME_DIR) -> Pat
     if not runtime_dir.exists():
         raise FileNotFoundError(f"runtime directory does not exist: {runtime_dir}")
     DIST_DIR.mkdir(parents=True, exist_ok=True)
-    artifact_base = DIST_DIR / f"audiocover-backend-runtimes-{pack_name}-{_platform_name()}"
+    artifact_base = DIST_DIR / _versioned_artifact_stem("backend-runtimes", pack_name, _platform_name())
     archive_format = "zip" if _normalize_system(platform.system()) == "windows" else "gztar"
     artifact = Path(
         shutil.make_archive(str(artifact_base), archive_format, root_dir=ROOT, base_dir=runtime_dir.name)

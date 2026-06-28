@@ -243,6 +243,7 @@ def main() -> None:
     if _run_embedded_worker():
         return
     if "--smoke-test" in sys.argv:
+        RenderConfig.from_yaml(default_config_path())
         return
     AudioCoverGui().run()
 

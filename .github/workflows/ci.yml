@@ -36,7 +36,7 @@ jobs:
       - name: Tests
         run: pytest
 
-  single-file-packaging:
+  desktop-packaging:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -49,7 +49,7 @@ jobs:
         run: python -m pip install --index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple "torch==2.8.0+cpu" "torchaudio==2.8.0+cpu"
       - name: Install build dependencies
         run: python -m pip install -U pip && python -m pip install -e ".[build,demucs-backend,so-vits-svc-backend]"
-      - name: Build CPU-only single-file desktop binary
+      - name: Build CPU-only fast desktop bundle
         run: python scripts/build_desktop.py
-      - name: Smoke test CPU-only single-file desktop binary
+      - name: Smoke test CPU-only desktop bundle
         run: python scripts/build_desktop.py --smoke-test-only

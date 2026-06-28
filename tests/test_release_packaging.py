@@ -38,8 +38,12 @@ def test_so_vits_backend_extra_declares_decoder_dependencies() -> None:
 
 def test_release_builds_cpu_only_fast_desktop_bundle_artifacts() -> None:
     workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+    ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
 
     assert "Build CPU-only fast desktop bundle" in workflow
+    assert "Build CPU-only fast desktop bundle" in ci
+    assert "desktop-packaging" in ci
+    assert "single-file-packaging" not in ci
     assert "https://download.pytorch.org/whl/cpu" in workflow
     assert "torch==2.8.0+cpu" in workflow
     assert "torchaudio==2.8.0+cpu" in workflow
@@ -80,6 +84,23 @@ def test_pyinstaller_spec_is_onedir_and_embeds_workers_and_assets() -> None:
         "audiocover.workers.so_vits_svc_worker",
     ):
         assert module in spec
+
+
+def test_build_script_resolves_onedir_executable(monkeypatch, tmp_path) -> None:
+    build_desktop = _build_desktop_module()
+    dist_dir = tmp_path / "dist"
+    app_dir = dist_dir / "AudioCover"
+    mac_app_dir = dist_dir / "AudioCover.app"
+    suffix = ".exe" if build_desktop._normalize_system(build_desktop.platform.system()) == "windows" else ""
+    executable = app_dir / f"AudioCover{suffix}"
+    executable.parent.mkdir(parents=True)
+    executable.write_text("", encoding="utf-8")
+
+    monkeypatch.setattr(build_desktop, "DIST_DIR", dist_dir)
+    monkeypatch.setattr(build_desktop, "APP_DIR", app_dir)
+    monkeypatch.setattr(build_desktop, "MAC_APP_DIR", mac_app_dir)
+
+    assert build_desktop._bundle_executable() == executable
 
 
 def test_build_script_prepares_bundle_assets_and_desktop_archive() -> None:

@@ -227,7 +227,7 @@ def _worker_executable(worker_name: str, runtime_dir: Path = RUNTIME_DIR) -> Pat
 def _bundle_executable() -> Path:
     suffix = ".exe" if _normalize_system(platform.system()) == "windows" else ""
     onefile = DIST_DIR / f"AudioCover{suffix}"
-    if onefile.exists():
+    if onefile.is_file():
         return onefile
     system = _normalize_system(platform.system())
     if system == "windows":

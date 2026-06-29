@@ -14,7 +14,7 @@ conversion:
   protect: 0.33
   index_rate: 0.75
   rms_mix_rate: 0.25
-  noise_scale: 0.085
+  noise_scale: 0.12
   db_thresh: -40
   pad_seconds: 0.5
   chunk_seconds: 0.5

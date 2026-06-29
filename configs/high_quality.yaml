@@ -9,18 +9,18 @@ conversion:
   backend: auto
   pitch_shift_mode: auto
   command_template: null
-  f0_method: crepe-tiny
+  f0_method: crepe
   transpose: 0
   protect: 0.33
   index_rate: 0.75
   rms_mix_rate: 0.25
-  noise_scale: 0.095
+  noise_scale: 0.06
   db_thresh: -40
   pad_seconds: 0.5
   chunk_seconds: 0.5
 mix:
   sample_rate: 48000
-  instrumental_gain_db: -1.5
+  instrumental_gain_db: 0.0
   vocal_gain_db: 0.0
   vocal_highpass_hz: 70.0
   vocal_lowpass_hz: 18000.0
@@ -61,22 +61,30 @@ mix:
   vocal_gate_attack_ms: 12.0
   vocal_gate_release_ms: 180.0
   vocal_gate_floor: 0.0
+  vocal_tail_cleanup: true
+  vocal_tail_gate_threshold_db: -48.0
+  vocal_tail_gate_relative_db: -32.0
+  vocal_tail_gate_knee_db: 7.0
+  vocal_tail_gate_attack_ms: 6.0
+  vocal_tail_gate_release_ms: 75.0
   match_vocal_loudness: true
-  vocal_loudness_offset_db: -1.5
-  vocal_loudness_gain_limit_db: 8.0
+  match_original_stem_balance: true
+  original_stem_balance_gain_limit_db: 5.0
+  vocal_loudness_offset_db: 0.0
+  vocal_loudness_gain_limit_db: 10.0
   match_vocal_dynamics: true
-  vocal_dynamics_strength: 0.86
-  vocal_dynamics_gain_limit_db: 8.5
+  vocal_dynamics_strength: 0.94
+  vocal_dynamics_gain_limit_db: 10.0
   vocal_dynamics_attack_ms: 18.0
   vocal_dynamics_release_ms: 150.0
   match_vocal_macro_dynamics: true
-  vocal_macro_dynamics_strength: 0.68
-  vocal_macro_dynamics_gain_limit_db: 5.0
+  vocal_macro_dynamics_strength: 0.82
+  vocal_macro_dynamics_gain_limit_db: 7.0
   vocal_macro_dynamics_frame_ms: 700.0
   vocal_macro_dynamics_hop_ms: 120.0
   vocal_macro_dynamics_attack_ms: 260.0
   vocal_macro_dynamics_release_ms: 900.0
-  sidechain_ducking_db: -1.8
+  sidechain_ducking_db: -0.8
 qc: {}
 keep_intermediates: true
 overwrite: false

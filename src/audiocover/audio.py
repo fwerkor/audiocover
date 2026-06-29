@@ -249,6 +249,37 @@ def match_active_loudness(
     return (data * db_to_gain(applied_db)).astype(np.float32), float(applied_db)
 
 
+def match_original_stem_balance(
+    vocal: np.ndarray,
+    instrumental: np.ndarray,
+    reference_vocal: np.ndarray,
+    reference_instrumental: np.ndarray,
+    *,
+    mask: np.ndarray | None = None,
+    max_gain_db: float = 5.0,
+) -> tuple[np.ndarray, float]:
+    """Match converted-vocal / instrumental ratio to the separated original stems."""
+    ref_vocal_rms = _active_rms(reference_vocal, mask)
+    ref_inst_rms = _active_rms(reference_instrumental, mask)
+    vocal_rms = _active_rms(vocal, mask)
+    inst_rms = _active_rms(instrumental, mask)
+    if min(ref_vocal_rms, ref_inst_rms, vocal_rms, inst_rms) <= 1e-8:
+        return vocal.astype(np.float32), 0.0
+    ref_ratio_db = gain_to_db(ref_vocal_rms / ref_inst_rms)
+    current_ratio_db = gain_to_db(vocal_rms / inst_rms)
+    gain_db = float(np.clip(ref_ratio_db - current_ratio_db, -max_gain_db, max_gain_db))
+    return (vocal * db_to_gain(gain_db)).astype(np.float32), gain_db
+
+
+def suppress_vocal_tails(data: np.ndarray, reference_mask: np.ndarray | None, sr: int) -> np.ndarray:
+    """Fade converter residue where the original vocal stem is inactive."""
+    if reference_mask is None or reference_mask.size == 0 or data.size == 0:
+        return data.astype(np.float32)
+    mask = match_length(reference_mask, len(data))[:, 0].astype(np.float32)
+    mask = smooth_envelope(np.clip(mask, 0.0, 1.0), sr, attack_ms=4.0, release_ms=45.0)
+    return (data * np.clip(mask, 0.0, 1.0)[:, None]).astype(np.float32)
+
+
 def apply_sidechain_ducking(
     instrumental: np.ndarray,
     activity_mask: np.ndarray,

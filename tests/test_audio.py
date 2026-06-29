@@ -12,11 +12,13 @@ from audiocover.audio import (
     match_channels,
     match_dynamic_envelope,
     match_length,
+    match_original_stem_balance,
     normalize_lufs,
     parallel_compress,
     peak_dbfs,
     plate_reverb,
     soft_saturation,
+    suppress_vocal_tails,
     vocal_activity_mask,
     vocal_body_eq,
     vocal_doubler,
@@ -139,3 +141,29 @@ def test_animate_sustains_adds_subtle_motion_to_loud_sections() -> None:
     assert np.all(np.isfinite(animated))
     assert float(np.std(animated[:, 0])) > 0.0005
     assert peak_dbfs(animated) <= -18.0
+
+
+def test_match_original_stem_balance_restores_vocal_instrumental_ratio() -> None:
+    ref_vocal = np.ones((1000, 1), dtype=np.float32) * 0.10
+    ref_inst = np.ones((1000, 1), dtype=np.float32) * 0.05
+    converted_vocal = np.ones((1000, 1), dtype=np.float32) * 0.02
+    inst = np.ones((1000, 1), dtype=np.float32) * 0.05
+    mask = np.ones((1000, 1), dtype=np.float32)
+
+    matched, gain_db = match_original_stem_balance(converted_vocal, inst, ref_vocal, ref_inst, mask=mask, max_gain_db=16.0)
+
+    assert gain_db > 5.0
+    ratio = float(np.sqrt(np.mean(np.square(matched))) / np.sqrt(np.mean(np.square(inst))))
+    assert 1.8 < ratio < 2.2
+
+
+def test_suppress_vocal_tails_fades_inactive_regions() -> None:
+    sr = 1000
+    data = np.ones((sr * 3, 1), dtype=np.float32) * 0.08
+    mask = np.zeros_like(data)
+    mask[:sr] = 1.0
+
+    cleaned = suppress_vocal_tails(data, mask, sr)
+
+    assert float(np.mean(np.abs(cleaned[: sr // 2]))) > 0.05
+    assert float(np.mean(np.abs(cleaned[2 * sr :]))) < 0.005

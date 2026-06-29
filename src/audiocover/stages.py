@@ -17,12 +17,14 @@ from .audio import (
     match_channels,
     match_dynamic_envelope,
     match_length,
+    match_original_stem_balance,
     normalize_lufs,
     parallel_compress,
     plate_reverb,
     reduce_vocal_harshness,
     soft_knee_compressor,
     soft_saturation,
+    suppress_vocal_tails,
     vocal_activity_mask,
     vocal_body_eq,
     vocal_doubler,
@@ -242,6 +244,7 @@ def polish_and_mix(
         reference_vocal = match_length(reference_vocal, length)
 
     activity_mask = None
+    tail_mask = None
     if cfg.vocal_silence_gate and reference_vocal is not None:
         activity_mask = vocal_activity_mask(
             reference_vocal,
@@ -255,6 +258,18 @@ def polish_and_mix(
         )
         activity_mask = match_length(activity_mask, length)
         vocal = (vocal * activity_mask).astype("float32")
+        if cfg.vocal_tail_cleanup:
+            tail_mask = vocal_activity_mask(
+                reference_vocal,
+                sr,
+                threshold_db=cfg.vocal_tail_gate_threshold_db,
+                relative_threshold_db=cfg.vocal_tail_gate_relative_db,
+                knee_db=cfg.vocal_tail_gate_knee_db,
+                attack_ms=cfg.vocal_tail_gate_attack_ms,
+                release_ms=cfg.vocal_tail_gate_release_ms,
+                floor=0.0,
+            )
+            tail_mask = match_length(tail_mask, length)
 
     vocal = biquad_filter(vocal, sr, "highpass", cfg.vocal_highpass_hz)
     vocal = biquad_filter(vocal, sr, "lowpass", cfg.vocal_lowpass_hz)
@@ -265,6 +280,15 @@ def polish_and_mix(
             mask=activity_mask,
             target_offset_db=cfg.vocal_loudness_offset_db,
             max_gain_db=cfg.vocal_loudness_gain_limit_db,
+        )
+    if cfg.match_original_stem_balance and reference_vocal is not None:
+        vocal, _balance_gain_db = match_original_stem_balance(
+            vocal,
+            instrumental,
+            reference_vocal,
+            instrumental,
+            mask=activity_mask,
+            max_gain_db=cfg.original_stem_balance_gain_limit_db,
         )
     vocal = deess(vocal, sr, cfg.deess_amount)
     vocal = reduce_vocal_harshness(vocal, sr, amount=cfg.harshness_reduction_amount)
@@ -347,6 +371,8 @@ def polish_and_mix(
         left_delay_ms=cfg.vocal_doubler_left_delay_ms,
         right_delay_ms=cfg.vocal_doubler_right_delay_ms,
     )
+    if cfg.vocal_tail_cleanup:
+        vocal = suppress_vocal_tails(vocal, tail_mask if tail_mask is not None else activity_mask, sr)
 
     polished = out_dir / "polished_vocal.wav"
     write_audio(polished, limiter(vocal, cfg.final_peak_db), sr)

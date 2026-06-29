@@ -780,7 +780,7 @@ def convert(payload: dict[str, Any]) -> dict[str, Any]:
         transpose=int(payload.get("transpose") or 0),
         auto_predict_f0=True,
         cluster_infer_ratio=float(payload.get("cluster_infer_ratio") or 0),
-        noise_scale=float(payload.get("noise_scale") or 0.095),
+        noise_scale=float(payload.get("noise_scale") or 0.06),
         f0_method=f0_method,
         db_thresh=int(payload.get("db_thresh") or -40),
         pad_seconds=float(payload.get("pad_seconds") or 0.5),

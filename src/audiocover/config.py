@@ -33,12 +33,12 @@ class ConversionConfig(BaseModel):
     cluster_model_path: Path | None = None
     simple_profile_path: Path | None = None
     speaker: str | None = None
-    f0_method: str = "crepe-tiny"
+    f0_method: str = "crepe"
     transpose: int = Field(default=0, ge=-24, le=24)
     protect: float = Field(default=0.33, ge=0.0, le=1.0)
     index_rate: float = Field(default=0.75, ge=0.0, le=1.0)
     rms_mix_rate: float = Field(default=0.25, ge=0.0, le=1.0)
-    noise_scale: float = Field(default=0.095, ge=0.0, le=2.0)
+    noise_scale: float = Field(default=0.06, ge=0.0, le=2.0)
     db_thresh: int = -40
     pad_seconds: float = Field(default=0.5, ge=0.0, le=5.0)
     chunk_seconds: float = Field(default=0.5, gt=0.0, le=30.0)
@@ -53,13 +53,13 @@ class TrainingConfig(BaseModel):
     segment_seconds: float = Field(default=12.0, ge=2.0, le=30.0)
     epochs: int = Field(default=200, ge=1)
     batch_size: int = Field(default=8, ge=1)
-    f0_method: str = "crepe-tiny"
+    f0_method: str = "crepe"
     commands: list[str] = Field(default_factory=list)
 
 
 class MixConfig(BaseModel):
     sample_rate: int = 48000
-    instrumental_gain_db: float = -1.5
+    instrumental_gain_db: float = 0.0
     vocal_gain_db: float = 0.0
     vocal_highpass_hz: float = 70.0
     vocal_lowpass_hz: float | None = 18000.0
@@ -100,22 +100,30 @@ class MixConfig(BaseModel):
     vocal_gate_attack_ms: float = Field(default=12.0, ge=1.0)
     vocal_gate_release_ms: float = Field(default=180.0, ge=1.0)
     vocal_gate_floor: float = Field(default=0.0, ge=0.0, le=1.0)
+    vocal_tail_cleanup: bool = True
+    vocal_tail_gate_threshold_db: float = -48.0
+    vocal_tail_gate_relative_db: float = -32.0
+    vocal_tail_gate_knee_db: float = Field(default=7.0, gt=0.0)
+    vocal_tail_gate_attack_ms: float = Field(default=6.0, ge=1.0)
+    vocal_tail_gate_release_ms: float = Field(default=75.0, ge=1.0)
     match_vocal_loudness: bool = True
-    vocal_loudness_offset_db: float = -1.5
-    vocal_loudness_gain_limit_db: float = Field(default=8.0, ge=0.0)
+    match_original_stem_balance: bool = True
+    original_stem_balance_gain_limit_db: float = Field(default=5.0, ge=0.0)
+    vocal_loudness_offset_db: float = 0.0
+    vocal_loudness_gain_limit_db: float = Field(default=10.0, ge=0.0)
     match_vocal_dynamics: bool = True
-    vocal_dynamics_strength: float = Field(default=0.86, ge=0.0, le=1.0)
-    vocal_dynamics_gain_limit_db: float = Field(default=8.5, ge=0.0)
+    vocal_dynamics_strength: float = Field(default=0.94, ge=0.0, le=1.0)
+    vocal_dynamics_gain_limit_db: float = Field(default=10.0, ge=0.0)
     vocal_dynamics_attack_ms: float = Field(default=18.0, ge=1.0)
     vocal_dynamics_release_ms: float = Field(default=150.0, ge=1.0)
     match_vocal_macro_dynamics: bool = True
-    vocal_macro_dynamics_strength: float = Field(default=0.68, ge=0.0, le=1.0)
-    vocal_macro_dynamics_gain_limit_db: float = Field(default=5.0, ge=0.0)
+    vocal_macro_dynamics_strength: float = Field(default=0.82, ge=0.0, le=1.0)
+    vocal_macro_dynamics_gain_limit_db: float = Field(default=7.0, ge=0.0)
     vocal_macro_dynamics_frame_ms: float = Field(default=700.0, ge=50.0)
     vocal_macro_dynamics_hop_ms: float = Field(default=120.0, ge=10.0)
     vocal_macro_dynamics_attack_ms: float = Field(default=260.0, ge=1.0)
     vocal_macro_dynamics_release_ms: float = Field(default=900.0, ge=1.0)
-    sidechain_ducking_db: float = -1.8
+    sidechain_ducking_db: float = -0.8
 
 
 class QcConfig(BaseModel):
@@ -155,7 +163,7 @@ class ModelPackage(BaseModel):
     voice_profile_path: Path | None = None
     speaker: str | None = None
     transpose: int = 0
-    f0_method: str = "crepe-tiny"
+    f0_method: str = "crepe"
     created_by: str = "audiocover"
     notes: str | None = None
 

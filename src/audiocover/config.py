@@ -38,7 +38,7 @@ class ConversionConfig(BaseModel):
     protect: float = Field(default=0.33, ge=0.0, le=1.0)
     index_rate: float = Field(default=0.75, ge=0.0, le=1.0)
     rms_mix_rate: float = Field(default=0.25, ge=0.0, le=1.0)
-    noise_scale: float = Field(default=0.10, ge=0.0, le=2.0)
+    noise_scale: float = Field(default=0.085, ge=0.0, le=2.0)
     db_thresh: int = -40
     pad_seconds: float = Field(default=0.5, ge=0.0, le=5.0)
     chunk_seconds: float = Field(default=0.5, gt=0.0, le=30.0)
@@ -70,6 +70,8 @@ class MixConfig(BaseModel):
     deess_amount: float = Field(default=0.16, ge=0.0, le=1.0)
     harshness_reduction_amount: float = Field(default=0.12, ge=0.0, le=1.0)
     electronic_artifact_reduction_amount: float = Field(default=0.16, ge=0.0, le=1.0)
+    vocal_denoise_amount: float = Field(default=0.18, ge=0.0, le=1.0)
+    vocal_denoise_floor: float = Field(default=0.78, ge=0.35, le=1.0)
     vocal_saturation_amount: float = Field(default=0.0, ge=0.0, le=1.0)
     vocal_saturation_drive_db: float = Field(default=0.0, ge=0.0, le=12.0)
     parallel_compression_mix: float = Field(default=0.0, ge=0.0, le=1.0)

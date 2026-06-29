@@ -18,6 +18,7 @@ from audiocover.audio import (
     peak_dbfs,
     plate_reverb,
     reduce_electronic_artifacts,
+    reduce_vocal_noise,
     soft_saturation,
     suppress_vocal_tails,
     vocal_activity_mask,
@@ -181,3 +182,19 @@ def test_reduce_electronic_artifacts_keeps_signal_safe() -> None:
     assert np.all(np.isfinite(cleaned))
     assert peak_dbfs(cleaned) <= 0.0
     assert not np.allclose(cleaned, base)
+
+
+def test_reduce_vocal_noise_is_safe_and_active() -> None:
+    sr = 48000
+    rng = np.random.default_rng(0)
+    t = np.linspace(0, 1, sr, endpoint=False)
+    voiced = 0.045 * np.sin(2 * np.pi * 220 * t)
+    noise = rng.normal(0.0, 0.004, size=sr)
+    data = (voiced + noise).astype(np.float32)[:, None]
+
+    cleaned = reduce_vocal_noise(data, sr, amount=0.25, floor=0.72)
+
+    assert cleaned.shape == data.shape
+    assert np.all(np.isfinite(cleaned))
+    assert peak_dbfs(cleaned) <= 0.0
+    assert not np.allclose(cleaned, data)

@@ -23,6 +23,7 @@ from .audio import (
     plate_reverb,
     reduce_electronic_artifacts,
     reduce_vocal_harshness,
+    reduce_vocal_noise,
     soft_knee_compressor,
     soft_saturation,
     suppress_vocal_tails,
@@ -292,6 +293,7 @@ def polish_and_mix(
             max_gain_db=cfg.original_stem_balance_gain_limit_db,
         )
     vocal = deess(vocal, sr, cfg.deess_amount)
+    vocal = reduce_vocal_noise(vocal, sr, amount=cfg.vocal_denoise_amount, floor=cfg.vocal_denoise_floor)
     vocal = reduce_vocal_harshness(vocal, sr, amount=cfg.harshness_reduction_amount)
     vocal = reduce_electronic_artifacts(vocal, sr, amount=cfg.electronic_artifact_reduction_amount)
     vocal = soft_knee_compressor(

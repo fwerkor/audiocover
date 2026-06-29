@@ -332,6 +332,46 @@ def match_dynamic_envelope(
     return (data * gain[:, None]).astype(np.float32)
 
 
+def reduce_vocal_noise(
+    data: np.ndarray,
+    sr: int,
+    *,
+    amount: float = 0.18,
+    floor: float = 0.72,
+) -> np.ndarray:
+    """Light spectral denoise for converted vocals.
+
+    This estimates a per-frequency floor from the quietest short-time frames and
+    applies limited soft attenuation. It is intentionally conservative so it does
+    not create strong watery artifacts or damage intelligibility.
+    """
+    if amount <= 0 or data.size == 0:
+        return data.astype(np.float32)
+    amount = float(np.clip(amount, 0.0, 1.0))
+    floor = float(np.clip(floor, 0.35, 1.0))
+    nperseg = min(2048, max(256, int(sr * 0.046)))
+    noverlap = nperseg // 2
+    channels: list[np.ndarray] = []
+    for ch in range(data.shape[1]):
+        x = data[:, ch].astype(np.float32)
+        freqs, _times, zxx = signal.stft(x, fs=sr, nperseg=nperseg, noverlap=noverlap, boundary="zeros")
+        mag = np.abs(zxx)
+        if mag.size == 0:
+            channels.append(x)
+            continue
+        frame_energy = np.sqrt(np.mean(np.square(mag), axis=0))
+        quiet_count = max(3, int(frame_energy.size * 0.18))
+        quiet_idx = np.argsort(frame_energy)[:quiet_count]
+        noise = np.percentile(mag[:, quiet_idx], 65, axis=1, keepdims=True)
+        threshold = noise * (1.15 + 1.75 * amount)
+        mask = 1.0 - amount * np.clip((threshold - mag) / np.maximum(threshold, 1e-8), 0.0, 1.0)
+        mask = np.maximum(mask, floor)
+        mask[freqs < 90.0, :] = 1.0
+        _, cleaned = signal.istft(zxx * mask, fs=sr, nperseg=nperseg, noverlap=noverlap, input_onesided=True)
+        channels.append(match_length(cleaned.astype(np.float32)[:, None], len(data))[:, 0])
+    return np.stack(channels, axis=1).astype(np.float32)
+
+
 def reduce_vocal_harshness(
     data: np.ndarray,
     sr: int,

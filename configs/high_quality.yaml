@@ -14,7 +14,7 @@ conversion:
   protect: 0.33
   index_rate: 0.75
   rms_mix_rate: 0.25
-  noise_scale: 0.10
+  noise_scale: 0.085
   db_thresh: -40
   pad_seconds: 0.5
   chunk_seconds: 0.5
@@ -31,6 +31,8 @@ mix:
   deess_amount: 0.16
   harshness_reduction_amount: 0.12
   electronic_artifact_reduction_amount: 0.16
+  vocal_denoise_amount: 0.18
+  vocal_denoise_floor: 0.78
   vocal_saturation_amount: 0.0
   vocal_saturation_drive_db: 0.0
   parallel_compression_mix: 0.0

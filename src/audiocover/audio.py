@@ -362,6 +362,129 @@ def deess(data: np.ndarray, sr: int, amount: float = 0.18) -> np.ndarray:
     return (data - band * amount + controlled * amount).astype(np.float32)
 
 
+def soft_saturation(
+    data: np.ndarray,
+    *,
+    amount: float = 0.12,
+    drive_db: float = 3.0,
+) -> np.ndarray:
+    if amount <= 0 or data.size == 0:
+        return data.astype(np.float32)
+    drive = float(db_to_gain(drive_db))
+    driven = data * drive
+    ceiling = np.tanh(drive)
+    if abs(ceiling) < 1e-6:
+        return data.astype(np.float32)
+    saturated = np.tanh(driven) / ceiling
+    return (data * (1.0 - amount) + saturated * amount).astype(np.float32)
+
+
+def parallel_compress(
+    data: np.ndarray,
+    sr: int,
+    *,
+    mix: float = 0.16,
+    threshold_db: float = -24.0,
+    ratio: float = 4.0,
+    attack_ms: float = 6.0,
+    release_ms: float = 140.0,
+    makeup_db: float = 1.8,
+) -> np.ndarray:
+    if mix <= 0 or data.size == 0:
+        return data.astype(np.float32)
+    compressed = soft_knee_compressor(
+        data,
+        sr,
+        threshold_db=threshold_db,
+        ratio=ratio,
+        attack_ms=attack_ms,
+        release_ms=release_ms,
+    )
+    compressed = compressed * db_to_gain(makeup_db)
+    return (data * (1.0 - mix) + compressed * mix).astype(np.float32)
+
+
+def _peaking_eq_sos(sr: int, freq_hz: float, gain_db: float, q: float) -> np.ndarray:
+    freq = min(max(float(freq_hz), 20.0), sr / 2.0 - 100.0)
+    q = max(float(q), 0.05)
+    a = float(db_to_gain(gain_db / 2.0))
+    omega = 2.0 * math.pi * freq / float(sr)
+    alpha = math.sin(omega) / (2.0 * q)
+    cos_w = math.cos(omega)
+    b0 = 1.0 + alpha * a
+    b1 = -2.0 * cos_w
+    b2 = 1.0 - alpha * a
+    a0 = 1.0 + alpha / a
+    a1 = -2.0 * cos_w
+    a2 = 1.0 - alpha / a
+    return np.asarray([[b0 / a0, b1 / a0, b2 / a0, 1.0, a1 / a0, a2 / a0]], dtype=np.float64)
+
+
+def vocal_body_eq(
+    data: np.ndarray,
+    sr: int,
+    *,
+    gain_db: float = 1.1,
+    freq_hz: float = 220.0,
+    q: float = 0.8,
+) -> np.ndarray:
+    if abs(gain_db) < 1e-6 or data.size == 0:
+        return data.astype(np.float32)
+    sos = _peaking_eq_sos(sr, freq_hz, gain_db, q)
+    return signal.sosfiltfilt(sos, data, axis=0).astype(np.float32)
+
+
+def plate_reverb(
+    data: np.ndarray,
+    sr: int,
+    *,
+    wet: float = 0.10,
+    decay: float = 0.82,
+    predelay_ms: float = 32.0,
+    lowcut_hz: float = 190.0,
+    highcut_hz: float = 8500.0,
+) -> np.ndarray:
+    if wet <= 0 or data.size == 0:
+        return data.astype(np.float32)
+    taps_ms = [0, 17, 31, 47, 67, 89, 113, 149, 191, 239, 293]
+    wet_signal = np.zeros_like(data, dtype=np.float32)
+    for i, ms in enumerate(taps_ms):
+        delay = int(sr * (predelay_ms + ms) / 1000.0)
+        if 0 < delay < len(data):
+            gain = (decay ** i) / math.sqrt(i + 1.0)
+            wet_signal[delay:] += data[:-delay] * gain
+    if lowcut_hz > 0:
+        wet_signal = biquad_filter(wet_signal, sr, "highpass", lowcut_hz)
+    high = min(float(highcut_hz), sr / 2.0 - 100.0)
+    if high > 500.0:
+        wet_signal = biquad_filter(wet_signal, sr, "lowpass", high)
+    return limiter(data + wet_signal * wet, -0.5)
+
+
+def vocal_doubler(
+    data: np.ndarray,
+    sr: int,
+    *,
+    mix: float = 0.055,
+    left_delay_ms: float = 14.0,
+    right_delay_ms: float = 23.0,
+) -> np.ndarray:
+    if mix <= 0 or data.size == 0:
+        return data.astype(np.float32)
+    channels = data.shape[1] if data.ndim > 1 else 1
+    src = data if data.ndim > 1 else data[:, None]
+    doubled = np.zeros_like(src, dtype=np.float32)
+    delays = [left_delay_ms, right_delay_ms]
+    for ch in range(channels):
+        delay_ms = delays[ch % 2]
+        delay = int(sr * delay_ms / 1000.0)
+        if 0 < delay < len(src):
+            doubled[delay:, ch] = src[:-delay, ch]
+    if channels == 1:
+        doubled = doubled * 0.5
+    return (src + doubled * mix).astype(np.float32)
+
+
 def simple_room_reverb(data: np.ndarray, sr: int, wet: float = 0.055, decay: float = 0.28) -> np.ndarray:
     if wet <= 0:
         return data

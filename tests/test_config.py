@@ -62,6 +62,11 @@ def test_high_quality_defaults_include_expression_controls() -> None:
 
     assert cfg.conversion.noise_scale == 0.18
     assert cfg.mix.match_vocal_dynamics is True
-    assert cfg.mix.vocal_dynamics_strength >= 0.7
+    assert cfg.mix.vocal_dynamics_strength >= 0.85
     assert cfg.mix.compressor_ratio < 2.0
     assert cfg.mix.harshness_reduction_amount >= 0.24
+    assert cfg.mix.vocal_saturation_amount > 0
+    assert cfg.mix.parallel_compression_mix > 0
+    assert cfg.mix.vocal_body_gain_db > 0
+    assert cfg.mix.reverb_predelay_ms > 0
+    assert cfg.mix.vocal_doubler_mix > 0

@@ -12,8 +12,13 @@ from audiocover.audio import (
     match_dynamic_envelope,
     match_length,
     normalize_lufs,
+    parallel_compress,
     peak_dbfs,
+    plate_reverb,
+    soft_saturation,
     vocal_activity_mask,
+    vocal_body_eq,
+    vocal_doubler,
 )
 
 
@@ -102,3 +107,20 @@ def test_match_dynamic_envelope_restores_section_contrast() -> None:
     quiet_rms = float(np.sqrt(np.mean(np.square(shaped[:sr]))))
     loud_rms = float(np.sqrt(np.mean(np.square(shaped[sr:]))))
     assert loud_rms > quiet_rms * 1.8
+
+
+def test_professional_vocal_polish_helpers_keep_audio_safe() -> None:
+    sr = 48000
+    t = np.linspace(0, 1, sr, endpoint=False)
+    base = (0.08 * np.sin(2 * np.pi * 180 * t) + 0.02 * np.sin(2 * np.pi * 2200 * t))[:, None].astype(np.float32)
+
+    polished = soft_saturation(base, amount=0.12, drive_db=3.0)
+    polished = parallel_compress(polished, sr, mix=0.18)
+    polished = vocal_body_eq(polished, sr, gain_db=1.15)
+    polished = plate_reverb(polished, sr, wet=0.08, decay=0.7)
+    polished = vocal_doubler(polished, sr, mix=0.05)
+
+    assert polished.shape == base.shape
+    assert np.all(np.isfinite(polished))
+    assert peak_dbfs(polished) <= 0.0
+    assert not np.allclose(polished, base)

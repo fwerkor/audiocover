@@ -17,10 +17,14 @@ from .audio import (
     match_dynamic_envelope,
     match_length,
     normalize_lufs,
+    parallel_compress,
+    plate_reverb,
     reduce_vocal_harshness,
-    simple_room_reverb,
     soft_knee_compressor,
+    soft_saturation,
     vocal_activity_mask,
+    vocal_body_eq,
+    vocal_doubler,
     write_audio,
 )
 from .config import (
@@ -282,7 +286,38 @@ def polish_and_mix(
             attack_ms=cfg.vocal_dynamics_attack_ms,
             release_ms=cfg.vocal_dynamics_release_ms,
         )
-    vocal = simple_room_reverb(vocal, sr, wet=cfg.reverb_wet, decay=cfg.reverb_decay)
+    vocal = soft_saturation(vocal, amount=cfg.vocal_saturation_amount, drive_db=cfg.vocal_saturation_drive_db)
+    vocal = parallel_compress(
+        vocal,
+        sr,
+        mix=cfg.parallel_compression_mix,
+        threshold_db=cfg.parallel_compression_threshold_db,
+        ratio=cfg.parallel_compression_ratio,
+        makeup_db=cfg.parallel_compression_makeup_db,
+    )
+    vocal = vocal_body_eq(
+        vocal,
+        sr,
+        gain_db=cfg.vocal_body_gain_db,
+        freq_hz=cfg.vocal_body_freq_hz,
+        q=cfg.vocal_body_q,
+    )
+    vocal = plate_reverb(
+        vocal,
+        sr,
+        wet=cfg.reverb_wet,
+        decay=cfg.reverb_decay,
+        predelay_ms=cfg.reverb_predelay_ms,
+        lowcut_hz=cfg.reverb_lowcut_hz,
+        highcut_hz=cfg.reverb_highcut_hz,
+    )
+    vocal = vocal_doubler(
+        vocal,
+        sr,
+        mix=cfg.vocal_doubler_mix,
+        left_delay_ms=cfg.vocal_doubler_left_delay_ms,
+        right_delay_ms=cfg.vocal_doubler_right_delay_ms,
+    )
 
     polished = out_dir / "polished_vocal.wav"
     write_audio(polished, limiter(vocal, cfg.final_peak_db), sr)

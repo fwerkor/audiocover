@@ -55,7 +55,7 @@ mix:
   vocal_doubler_mix: 0.0
   vocal_doubler_left_delay_ms: 14.0
   vocal_doubler_right_delay_ms: 23.0
-  chorus_doubler_mix: 0.16
+  chorus_doubler_mix: 0.0
   chorus_doubler_delay_ms: 32.0
   chorus_doubler_threshold_percentile: 66.0
   chorus_doubler_highpass_hz: 130.0

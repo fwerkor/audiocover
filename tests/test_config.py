@@ -82,5 +82,5 @@ def test_high_quality_defaults_include_expression_controls() -> None:
     assert cfg.mix.reverb_wet <= 0.006
     assert cfg.mix.reverb_decay <= 0.18
     assert cfg.mix.vocal_doubler_mix == 0
-    assert 0 < cfg.mix.chorus_doubler_mix <= 0.18
+    assert cfg.mix.chorus_doubler_mix == 0
     assert 25.0 <= cfg.mix.chorus_doubler_delay_ms <= 38.0

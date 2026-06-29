@@ -94,7 +94,7 @@ class MixConfig(BaseModel):
     vocal_doubler_mix: float = Field(default=0.0, ge=0.0, le=0.5)
     vocal_doubler_left_delay_ms: float = Field(default=14.0, ge=1.0, le=80.0)
     vocal_doubler_right_delay_ms: float = Field(default=23.0, ge=1.0, le=80.0)
-    chorus_doubler_mix: float = Field(default=0.16, ge=0.0, le=0.35)
+    chorus_doubler_mix: float = Field(default=0.0, ge=0.0, le=0.35)
     chorus_doubler_delay_ms: float = Field(default=32.0, ge=8.0, le=45.0)
     chorus_doubler_threshold_percentile: float = Field(default=66.0, ge=40.0, le=95.0)
     chorus_doubler_highpass_hz: float = Field(default=130.0, ge=20.0, le=1000.0)

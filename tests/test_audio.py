@@ -9,6 +9,7 @@ from audiocover.audio import (
     limiter,
     match_active_loudness,
     match_channels,
+    match_dynamic_envelope,
     match_length,
     normalize_lufs,
     peak_dbfs,
@@ -86,3 +87,18 @@ def test_sidechain_ducking_reduces_active_regions_only() -> None:
 
     assert np.allclose(ducked[:200], instrumental[:200])
     assert float(np.mean(ducked[300:700])) < float(np.mean(instrumental[300:700]))
+
+
+def test_match_dynamic_envelope_restores_section_contrast() -> None:
+    sr = 1000
+    quiet_ref = np.ones((sr, 1), dtype=np.float32) * 0.02
+    loud_ref = np.ones((sr, 1), dtype=np.float32) * 0.12
+    reference = np.concatenate([quiet_ref, loud_ref], axis=0)
+    flat = np.ones_like(reference) * 0.06
+    mask = np.ones_like(reference)
+
+    shaped = match_dynamic_envelope(flat, reference, sr, mask=mask, strength=1.0, max_gain_db=12.0, attack_ms=5, release_ms=20)
+
+    quiet_rms = float(np.sqrt(np.mean(np.square(shaped[:sr]))))
+    loud_rms = float(np.sqrt(np.mean(np.square(shaped[sr:]))))
+    assert loud_rms > quiet_rms * 1.8

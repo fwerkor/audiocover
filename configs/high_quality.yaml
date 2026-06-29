@@ -14,17 +14,22 @@ conversion:
   protect: 0.33
   index_rate: 0.75
   rms_mix_rate: 0.25
+  noise_scale: 0.25
+  db_thresh: -40
+  pad_seconds: 0.5
+  chunk_seconds: 0.5
 mix:
   sample_rate: 48000
   instrumental_gain_db: -1.5
   vocal_gain_db: 0.0
   vocal_highpass_hz: 70.0
   vocal_lowpass_hz: 18000.0
-  compressor_threshold_db: -18.0
-  compressor_ratio: 2.8
-  compressor_attack_ms: 8.0
-  compressor_release_ms: 90.0
-  deess_amount: 0.18
+  compressor_threshold_db: -17.0
+  compressor_ratio: 2.1
+  compressor_attack_ms: 10.0
+  compressor_release_ms: 120.0
+  deess_amount: 0.22
+  harshness_reduction_amount: 0.16
   reverb_wet: 0.095
   reverb_decay: 0.42
   target_lufs: -14.0
@@ -39,6 +44,11 @@ mix:
   match_vocal_loudness: true
   vocal_loudness_offset_db: -1.5
   vocal_loudness_gain_limit_db: 8.0
+  match_vocal_dynamics: true
+  vocal_dynamics_strength: 0.48
+  vocal_dynamics_gain_limit_db: 5.0
+  vocal_dynamics_attack_ms: 35.0
+  vocal_dynamics_release_ms: 220.0
   sidechain_ducking_db: -1.8
 qc: {}
 keep_intermediates: true

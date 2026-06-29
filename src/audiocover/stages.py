@@ -14,8 +14,10 @@ from .audio import (
     load_audio,
     match_active_loudness,
     match_channels,
+    match_dynamic_envelope,
     match_length,
     normalize_lufs,
+    reduce_vocal_harshness,
     simple_room_reverb,
     soft_knee_compressor,
     vocal_activity_mask,
@@ -165,6 +167,10 @@ def convert_vocal(
                 "protect": cfg.protect,
                 "index_rate": cfg.index_rate,
                 "rms_mix_rate": cfg.rms_mix_rate,
+                "noise_scale": cfg.noise_scale,
+                "db_thresh": cfg.db_thresh,
+                "pad_seconds": cfg.pad_seconds,
+                "chunk_seconds": cfg.chunk_seconds,
                 "workdir": str(workdir),
                 "extra_args": cfg.extra_args,
             },
@@ -190,6 +196,10 @@ def convert_vocal(
             protect=cfg.protect,
             index_rate=cfg.index_rate,
             rms_mix_rate=cfg.rms_mix_rate,
+            noise_scale=cfg.noise_scale,
+            db_thresh=cfg.db_thresh,
+            pad_seconds=cfg.pad_seconds,
+            chunk_seconds=cfg.chunk_seconds,
             workdir=workdir,
         )
     else:
@@ -252,6 +262,7 @@ def polish_and_mix(
             max_gain_db=cfg.vocal_loudness_gain_limit_db,
         )
     vocal = deess(vocal, sr, cfg.deess_amount)
+    vocal = reduce_vocal_harshness(vocal, sr, amount=cfg.harshness_reduction_amount)
     vocal = soft_knee_compressor(
         vocal,
         sr,
@@ -260,6 +271,17 @@ def polish_and_mix(
         attack_ms=cfg.compressor_attack_ms,
         release_ms=cfg.compressor_release_ms,
     )
+    if cfg.match_vocal_dynamics and reference_vocal is not None:
+        vocal = match_dynamic_envelope(
+            vocal,
+            reference_vocal,
+            sr,
+            mask=activity_mask,
+            strength=cfg.vocal_dynamics_strength,
+            max_gain_db=cfg.vocal_dynamics_gain_limit_db,
+            attack_ms=cfg.vocal_dynamics_attack_ms,
+            release_ms=cfg.vocal_dynamics_release_ms,
+        )
     vocal = simple_room_reverb(vocal, sr, wet=cfg.reverb_wet, decay=cfg.reverb_decay)
 
     polished = out_dir / "polished_vocal.wav"

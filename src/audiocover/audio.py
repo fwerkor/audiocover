@@ -262,6 +262,64 @@ def apply_sidechain_ducking(
     return (instrumental * gain).astype(np.float32)
 
 
+def match_dynamic_envelope(
+    data: np.ndarray,
+    reference: np.ndarray,
+    sr: int,
+    *,
+    mask: np.ndarray | None = None,
+    strength: float = 0.45,
+    max_gain_db: float = 5.0,
+    frame_ms: float = 80.0,
+    hop_ms: float = 20.0,
+    attack_ms: float = 35.0,
+    release_ms: float = 220.0,
+) -> np.ndarray:
+    if strength <= 0 or data.size == 0 or reference.size == 0:
+        return data.astype(np.float32)
+    ref_env = _mono_rms_envelope(reference, sr, frame_ms=frame_ms, hop_ms=hop_ms)
+    data_env = _mono_rms_envelope(data, sr, frame_ms=frame_ms, hop_ms=hop_ms)
+    if ref_env.size == 0 or data_env.size == 0:
+        return data.astype(np.float32)
+    data_env = match_length(data_env[:, None], len(data))[:, 0]
+    ref_env = match_length(ref_env[:, None], len(data))[:, 0]
+    weights = np.ones(len(data), dtype=np.float32)
+    if mask is not None and mask.size:
+        weights = match_length(mask, len(data))[:, 0].astype(np.float32)
+    active = weights > 0.15
+    if not np.any(active):
+        return data.astype(np.float32)
+    ref_db = 20.0 * np.log10(np.maximum(ref_env, 1e-8))
+    data_db = 20.0 * np.log10(np.maximum(data_env, 1e-8))
+    ref_mid = float(np.median(ref_db[active]))
+    data_mid = float(np.median(data_db[active]))
+    target_delta = (ref_db - ref_mid) - (data_db - data_mid)
+    gain_db = np.clip(target_delta * float(strength), -max_gain_db, max_gain_db)
+    gain_db *= np.clip(weights, 0.0, 1.0)
+    smoothed = smooth_envelope(gain_db.astype(np.float32), sr, attack_ms=attack_ms, release_ms=release_ms)
+    gain = db_to_gain(smoothed)
+    return (data * gain[:, None]).astype(np.float32)
+
+
+def reduce_vocal_harshness(
+    data: np.ndarray,
+    sr: int,
+    *,
+    amount: float = 0.16,
+    low_hz: float = 2600.0,
+    high_hz: float = 7600.0,
+) -> np.ndarray:
+    if amount <= 0 or data.size == 0:
+        return data.astype(np.float32)
+    high = min(float(high_hz), sr / 2.0 - 100.0)
+    low = min(float(low_hz), high - 100.0)
+    if high <= low:
+        return data.astype(np.float32)
+    band = biquad_filter(data, sr, "bandpass", [low, high])
+    controlled = soft_knee_compressor(band, sr, threshold_db=-30.0, ratio=4.5, attack_ms=2.0, release_ms=70.0)
+    return (data - band * amount + controlled * amount).astype(np.float32)
+
+
 def biquad_filter(data: np.ndarray, sr: int, kind: str, cutoff) -> np.ndarray:
     if cutoff is None:
         return data

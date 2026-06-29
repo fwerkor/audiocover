@@ -70,10 +70,11 @@ def test_high_quality_defaults_include_expression_controls() -> None:
     assert cfg.mix.vocal_dynamics_strength >= 0.9
     assert cfg.mix.compressor_ratio < 2.0
     assert cfg.mix.harshness_reduction_amount >= 0.26
+    assert cfg.mix.electronic_artifact_reduction_amount > 0
     assert cfg.mix.vocal_saturation_amount <= 0.10
     assert cfg.mix.parallel_compression_mix <= 0.12
     assert cfg.mix.vocal_body_gain_db >= 1.1
     assert cfg.mix.vocal_warmth_gain_db > 0
-    assert cfg.mix.sustain_motion_amount_db > 0
+    assert cfg.mix.sustain_motion_amount_db <= 0.2
     assert cfg.mix.reverb_predelay_ms > 0
-    assert cfg.mix.vocal_doubler_mix > 0
+    assert cfg.mix.vocal_doubler_mix == 0

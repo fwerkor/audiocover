@@ -17,6 +17,7 @@ from audiocover.audio import (
     parallel_compress,
     peak_dbfs,
     plate_reverb,
+    reduce_electronic_artifacts,
     soft_saturation,
     suppress_vocal_tails,
     vocal_activity_mask,
@@ -167,3 +168,16 @@ def test_suppress_vocal_tails_fades_inactive_regions() -> None:
 
     assert float(np.mean(np.abs(cleaned[: sr // 2]))) > 0.05
     assert float(np.mean(np.abs(cleaned[2 * sr :]))) < 0.005
+
+
+def test_reduce_electronic_artifacts_keeps_signal_safe() -> None:
+    sr = 48000
+    t = np.linspace(0, 1, sr, endpoint=False)
+    base = (0.05 * np.sin(2 * np.pi * 220 * t) + 0.015 * np.sin(2 * np.pi * 7200 * t))[:, None].astype(np.float32)
+
+    cleaned = reduce_electronic_artifacts(base, sr, amount=0.25)
+
+    assert cleaned.shape == base.shape
+    assert np.all(np.isfinite(cleaned))
+    assert peak_dbfs(cleaned) <= 0.0
+    assert not np.allclose(cleaned, base)

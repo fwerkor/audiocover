@@ -351,6 +351,32 @@ def reduce_vocal_harshness(
     return (data - band * amount + controlled * amount).astype(np.float32)
 
 
+def reduce_electronic_artifacts(
+    data: np.ndarray,
+    sr: int,
+    *,
+    amount: float = 0.18,
+    low_hz: float = 4200.0,
+    high_hz: float = 13500.0,
+) -> np.ndarray:
+    """Suppress buzzy/phasey converter residues without changing pitch.
+
+    The processor only controls the high-mid/high band where neural-vocoder
+    residues tend to read as electronic. It avoids adding noise or flattening
+    the whole vocal.
+    """
+    if amount <= 0 or data.size == 0:
+        return data.astype(np.float32)
+    high = min(float(high_hz), sr / 2.0 - 100.0)
+    low = min(float(low_hz), high - 100.0)
+    if high <= low:
+        return data.astype(np.float32)
+    band = biquad_filter(data, sr, "bandpass", [low, high])
+    controlled = soft_knee_compressor(band, sr, threshold_db=-36.0, ratio=7.0, attack_ms=0.8, release_ms=55.0)
+    controlled *= 1.0 - 0.35 * amount
+    return (data - band * amount + controlled * amount).astype(np.float32)
+
+
 def biquad_filter(data: np.ndarray, sr: int, kind: str, cutoff) -> np.ndarray:
     if cutoff is None:
         return data

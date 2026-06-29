@@ -69,6 +69,7 @@ class MixConfig(BaseModel):
     compressor_release_ms: float = 180.0
     deess_amount: float = Field(default=0.25, ge=0.0, le=1.0)
     harshness_reduction_amount: float = Field(default=0.26, ge=0.0, le=1.0)
+    electronic_artifact_reduction_amount: float = Field(default=0.20, ge=0.0, le=1.0)
     vocal_saturation_amount: float = Field(default=0.08, ge=0.0, le=1.0)
     vocal_saturation_drive_db: float = Field(default=2.4, ge=0.0, le=12.0)
     parallel_compression_mix: float = Field(default=0.12, ge=0.0, le=1.0)
@@ -81,14 +82,14 @@ class MixConfig(BaseModel):
     vocal_warmth_gain_db: float = Field(default=0.35, ge=-6.0, le=6.0)
     vocal_warmth_freq_hz: float = Field(default=360.0, ge=80.0, le=1200.0)
     vocal_warmth_q: float = Field(default=0.65, gt=0.0, le=8.0)
-    sustain_motion_amount_db: float = Field(default=0.35, ge=0.0, le=3.0)
+    sustain_motion_amount_db: float = Field(default=0.18, ge=0.0, le=3.0)
     sustain_motion_rate_hz: float = Field(default=0.42, ge=0.05, le=3.0)
-    reverb_wet: float = Field(default=0.11, ge=0.0, le=1.0)
-    reverb_decay: float = Field(default=0.82, ge=0.05, le=2.0)
+    reverb_wet: float = Field(default=0.08, ge=0.0, le=1.0)
+    reverb_decay: float = Field(default=0.68, ge=0.05, le=2.0)
     reverb_predelay_ms: float = Field(default=32.0, ge=0.0, le=200.0)
     reverb_lowcut_hz: float = Field(default=190.0, ge=20.0, le=1000.0)
     reverb_highcut_hz: float = Field(default=8400.0, ge=1000.0, le=20000.0)
-    vocal_doubler_mix: float = Field(default=0.055, ge=0.0, le=0.5)
+    vocal_doubler_mix: float = Field(default=0.0, ge=0.0, le=0.5)
     vocal_doubler_left_delay_ms: float = Field(default=14.0, ge=1.0, le=80.0)
     vocal_doubler_right_delay_ms: float = Field(default=23.0, ge=1.0, le=80.0)
     target_lufs: float = -14.0
@@ -105,7 +106,7 @@ class MixConfig(BaseModel):
     vocal_tail_gate_relative_db: float = -32.0
     vocal_tail_gate_knee_db: float = Field(default=7.0, gt=0.0)
     vocal_tail_gate_attack_ms: float = Field(default=6.0, ge=1.0)
-    vocal_tail_gate_release_ms: float = Field(default=75.0, ge=1.0)
+    vocal_tail_gate_release_ms: float = Field(default=45.0, ge=1.0)
     match_vocal_loudness: bool = True
     match_original_stem_balance: bool = True
     original_stem_balance_gain_limit_db: float = Field(default=5.0, ge=0.0)

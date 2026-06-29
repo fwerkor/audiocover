@@ -21,6 +21,7 @@ from .audio import (
     normalize_lufs,
     parallel_compress,
     plate_reverb,
+    reduce_electronic_artifacts,
     reduce_vocal_harshness,
     soft_knee_compressor,
     soft_saturation,
@@ -292,6 +293,7 @@ def polish_and_mix(
         )
     vocal = deess(vocal, sr, cfg.deess_amount)
     vocal = reduce_vocal_harshness(vocal, sr, amount=cfg.harshness_reduction_amount)
+    vocal = reduce_electronic_artifacts(vocal, sr, amount=cfg.electronic_artifact_reduction_amount)
     vocal = soft_knee_compressor(
         vocal,
         sr,

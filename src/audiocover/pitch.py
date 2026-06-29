@@ -11,7 +11,7 @@ from scipy import signal
 
 from .audio import load_audio
 
-DEFAULT_CANDIDATE_TRANSPOSES = (-12, -7, -5, 0, 5, 7, 12)
+DEFAULT_CANDIDATE_TRANSPOSES = (-7, -5, 0, 5, 7)
 
 
 def _finite_positive(values: Iterable[float]) -> np.ndarray:
@@ -214,12 +214,34 @@ def choose_auto_transpose(
 
     low, high = target_range
     scored: list[dict[str, Any]] = []
+    input_median = float(np.median(values))
+    median_gap = 12.0 * math.log2(max(input_median, 1e-6) / float(target_median)) if target_median else 0.0
+
+    # Auto mode intentionally performs partial correction only. Large source/target
+    # range differences should be narrowed, not flattened into the model median.
+    selected = 0
+    reason = "already_in_target_range"
+    abs_gap = abs(median_gap)
+    if abs_gap >= 10.0:
+        selected = -7 if median_gap > 0 else 7
+        reason = "partially_reduced_large_pitch_gap"
+    elif abs_gap >= 6.0:
+        selected = -5 if median_gap > 0 else 5
+        reason = "partially_reduced_medium_pitch_gap"
+    else:
+        reason = "kept_original_small_pitch_gap"
+
+    allowed = set(candidates)
+    if selected not in allowed:
+        selected = 0
+        reason = "kept_original_no_allowed_partial_shift"
+
     for semitones in candidates:
         shifted = _transpose_values(values, semitones)
         score = _range_penalty(shifted, low, high)
         if target_median:
-            input_median = float(np.median(shifted))
-            median_distance = abs(12.0 * math.log2(max(input_median, 1e-6) / float(target_median)))
+            shifted_median = float(np.median(shifted))
+            median_distance = abs(12.0 * math.log2(max(shifted_median, 1e-6) / float(target_median)))
             score += 0.05 * median_distance
         score += 0.02 * abs(semitones)
         scored.append(
@@ -231,33 +253,6 @@ def choose_auto_transpose(
         )
 
     scored.sort(key=lambda item: (float(item["score"]), abs(int(item["transpose"]))))
-    zero_score = next((float(item["score"]) for item in scored if int(item["transpose"]) == 0), None)
-    best = scored[0]
-    best_transpose = int(best["transpose"])
-    selected = 0
-    reason = "already_in_target_range"
-    if target_median:
-        input_median = float(np.median(values))
-        median_gap = 12.0 * math.log2(max(input_median, 1e-6) / float(target_median))
-    else:
-        median_gap = 0.0
-    improvement = (zero_score - float(best["score"])) if zero_score is not None else 0.0
-    octave_ambiguous = (
-        abs(best_transpose) == 12
-        and 8.0 <= abs(median_gap) <= 16.5
-        and abs(abs(median_gap) - 12.0) <= 3.0
-    )
-    if best_transpose == 0:
-        reason = "already_in_target_range"
-    elif octave_ambiguous:
-        reason = "kept_original_due_to_octave_ambiguous_f0"
-    elif abs(median_gap) < 5.0:
-        reason = "kept_original_small_pitch_gap"
-    elif improvement < 6.0:
-        reason = "kept_original_marginal_pitch_improvement"
-    else:
-        selected = best_transpose
-        reason = "matched_target_range"
 
     return {
         "mode": "auto",

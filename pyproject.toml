@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "audiocover"
-version = "0.9.4"
+version = "1.0.0"
 description = "Desktop GUI and CLI for training target profiles and rendering audio covers."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -12,7 +12,7 @@ license = "MIT"
 authors = [{ name = "Yuhang Cao", email = "caoyuhang@fwerkor.com" }]
 keywords = ["audio", "singing", "voice-conversion", "desktop", "source-separation"]
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 5 - Production/Stable",
   "Environment :: Console",
   "Operating System :: OS Independent",
   "License :: OSI Approved :: MIT License",

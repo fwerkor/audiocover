@@ -9,6 +9,7 @@ from .audio import (
     animate_sustains,
     apply_sidechain_ducking,
     biquad_filter,
+    chorus_vocal_doubler,
     db_to_gain,
     deess,
     limiter,
@@ -374,6 +375,17 @@ def polish_and_mix(
         mix=cfg.vocal_doubler_mix,
         left_delay_ms=cfg.vocal_doubler_left_delay_ms,
         right_delay_ms=cfg.vocal_doubler_right_delay_ms,
+    )
+    vocal = chorus_vocal_doubler(
+        vocal,
+        sr,
+        reference=reference_vocal,
+        mask=activity_mask,
+        mix=cfg.chorus_doubler_mix,
+        delay_ms=cfg.chorus_doubler_delay_ms,
+        threshold_percentile=cfg.chorus_doubler_threshold_percentile,
+        highpass_hz=cfg.chorus_doubler_highpass_hz,
+        lowpass_hz=cfg.chorus_doubler_lowpass_hz,
     )
     if cfg.vocal_tail_cleanup:
         vocal = suppress_vocal_tails(vocal, tail_mask if tail_mask is not None else activity_mask, sr)

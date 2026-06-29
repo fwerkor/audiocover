@@ -628,6 +628,66 @@ def vocal_doubler(
     return (src + doubled * mix).astype(np.float32)
 
 
+def chorus_vocal_doubler(
+    data: np.ndarray,
+    sr: int,
+    *,
+    reference: np.ndarray | None = None,
+    mask: np.ndarray | None = None,
+    mix: float = 0.16,
+    delay_ms: float = 32.0,
+    threshold_percentile: float = 66.0,
+    highpass_hz: float = 130.0,
+    lowpass_hz: float = 9000.0,
+) -> np.ndarray:
+    """Add a weak delayed vocal layer only in high-energy sections.
+
+    This imitates the common chorus-section double-tracking treatment without
+    enabling a full-song doubler. The section mask is derived from the original
+    vocal stem when available, then smoothed so the extra layer fades in/out
+    over musical phrases instead of flickering syllable by syllable.
+    """
+    if mix <= 0 or data.size == 0:
+        return data.astype(np.float32)
+    src = data if data.ndim > 1 else data[:, None]
+    source = reference if reference is not None and reference.size else src
+    env = _mono_rms_envelope(source, sr, frame_ms=260.0, hop_ms=70.0)
+    if env.size == 0:
+        return src.astype(np.float32)
+    env = match_length(env[:, None], len(src))[:, 0]
+
+    weights = np.ones(len(src), dtype=np.float32)
+    if mask is not None and mask.size:
+        weights = match_length(mask, len(src))[:, 0].astype(np.float32)
+    active = env[weights > 0.2]
+    if active.size == 0:
+        return src.astype(np.float32)
+
+    threshold = float(np.percentile(active, threshold_percentile))
+    upper = float(np.percentile(active, 92.0))
+    spread = upper - threshold
+    if spread <= max(upper, 1e-7) * 0.025:
+        return src.astype(np.float32)
+    focus = np.clip((env - threshold) / max(spread, 1e-7), 0.0, 1.0)
+    focus = (focus * np.clip(weights, 0.0, 1.0)).astype(np.float32)
+    focus = smooth_envelope(focus, sr, attack_ms=190.0, release_ms=680.0)
+
+    channels = src.shape[1]
+    doubled = np.zeros_like(src, dtype=np.float32)
+    for ch in range(channels):
+        channel_delay_ms = float(delay_ms) + (6.0 if channels > 1 and ch % 2 else 0.0)
+        delay = int(sr * channel_delay_ms / 1000.0)
+        if 0 < delay < len(src):
+            doubled[delay:, ch] = src[:-delay, ch]
+
+    high = min(float(lowpass_hz), sr / 2.0 - 100.0)
+    if highpass_hz > 0 and highpass_hz < sr / 2.0 - 100.0:
+        doubled = biquad_filter(doubled, sr, "highpass", highpass_hz)
+    if high > 500.0:
+        doubled = biquad_filter(doubled, sr, "lowpass", high)
+    return (src + doubled * float(mix) * focus[:, None]).astype(np.float32)
+
+
 def simple_room_reverb(data: np.ndarray, sr: int, wet: float = 0.055, decay: float = 0.28) -> np.ndarray:
     if wet <= 0:
         return data

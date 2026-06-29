@@ -7,6 +7,7 @@ from audiocover import audio
 from audiocover.audio import (
     animate_sustains,
     apply_sidechain_ducking,
+    chorus_vocal_doubler,
     limiter,
     match_active_loudness,
     match_channels,
@@ -143,6 +144,37 @@ def test_animate_sustains_adds_subtle_motion_to_loud_sections() -> None:
     assert np.all(np.isfinite(animated))
     assert float(np.std(animated[:, 0])) > 0.0005
     assert peak_dbfs(animated) <= -18.0
+
+
+def test_chorus_vocal_doubler_targets_loud_sections() -> None:
+    sr = 1000
+    t = np.linspace(0, 3.0, sr * 3, endpoint=False)
+    tone = np.sin(2 * np.pi * 120 * t).astype(np.float32)[:, None]
+    envelope = np.concatenate([
+        np.ones((sr, 1), dtype=np.float32) * 0.03,
+        np.ones((sr, 1), dtype=np.float32) * 0.12,
+        np.ones((sr, 1), dtype=np.float32) * 0.03,
+    ])
+    data = tone * envelope
+    ref = data.copy()
+    mask = np.ones_like(data)
+
+    doubled = chorus_vocal_doubler(
+        data,
+        sr,
+        reference=ref,
+        mask=mask,
+        mix=0.20,
+        delay_ms=20.0,
+        threshold_percentile=60.0,
+        highpass_hz=20.0,
+        lowpass_hz=300.0,
+    )
+
+    assert doubled.shape == data.shape
+    assert np.all(np.isfinite(doubled))
+    assert float(np.mean(np.abs(doubled[sr + 100 : 2 * sr] - data[sr + 100 : 2 * sr]))) > 1e-4
+    assert np.allclose(doubled[: sr // 2], data[: sr // 2], atol=1e-4)
 
 
 def test_match_original_stem_balance_restores_vocal_instrumental_ratio() -> None:

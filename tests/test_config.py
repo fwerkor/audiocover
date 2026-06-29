@@ -16,7 +16,7 @@ def test_training_config_defaults_match_so_vits_preset() -> None:
     cfg = TrainingConfig.model_validate(data)
 
     assert cfg.sample_rate == 44100
-    assert cfg.f0_method == "harvest"
+    assert cfg.f0_method == "crepe-tiny"
 
 
 def test_default_config_path_uses_pyinstaller_meipass(monkeypatch, tmp_path: Path) -> None:
@@ -39,3 +39,19 @@ def test_model_package_roundtrip(tmp_path: Path) -> None:
     loaded = ModelPackage.from_yaml(path)
     assert loaded.display_name == "x"
     assert loaded.simple_profile_path == tmp_path / "simple_timbre.json"
+
+
+
+def test_render_config_f0_wins_over_legacy_model_package_default() -> None:
+    base = RenderConfig().conversion.model_copy(update={"f0_method": "crepe-tiny"})
+    package = ModelPackage(
+        display_name="legacy",
+        conversion={"backend": "managed", "runtime_backend": "so-vits-svc", "f0_method": "harvest"},
+        f0_method="harvest",
+    )
+
+    merged = package.merged_conversion(base)
+
+    assert merged.backend == "managed"
+    assert merged.runtime_backend == "so-vits-svc"
+    assert merged.f0_method == "crepe-tiny"

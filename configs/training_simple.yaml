@@ -3,5 +3,5 @@ sample_rate: 44100
 segment_seconds: 12.0
 epochs: 200
 batch_size: 8
-f0_method: harvest
+f0_method: crepe-tiny
 commands: []

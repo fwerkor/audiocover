@@ -33,7 +33,7 @@ class ConversionConfig(BaseModel):
     cluster_model_path: Path | None = None
     simple_profile_path: Path | None = None
     speaker: str | None = None
-    f0_method: str = "harvest"
+    f0_method: str = "crepe-tiny"
     transpose: int = Field(default=0, ge=-24, le=24)
     protect: float = Field(default=0.33, ge=0.0, le=1.0)
     index_rate: float = Field(default=0.75, ge=0.0, le=1.0)
@@ -49,7 +49,7 @@ class TrainingConfig(BaseModel):
     segment_seconds: float = Field(default=12.0, ge=2.0, le=30.0)
     epochs: int = Field(default=200, ge=1)
     batch_size: int = Field(default=8, ge=1)
-    f0_method: str = "harvest"
+    f0_method: str = "crepe-tiny"
     commands: list[str] = Field(default_factory=list)
 
 
@@ -64,10 +64,21 @@ class MixConfig(BaseModel):
     compressor_attack_ms: float = 8.0
     compressor_release_ms: float = 90.0
     deess_amount: float = Field(default=0.18, ge=0.0, le=1.0)
-    reverb_wet: float = Field(default=0.055, ge=0.0, le=1.0)
-    reverb_decay: float = Field(default=0.28, ge=0.05, le=2.0)
+    reverb_wet: float = Field(default=0.095, ge=0.0, le=1.0)
+    reverb_decay: float = Field(default=0.42, ge=0.05, le=2.0)
     target_lufs: float = -14.0
     final_peak_db: float = -1.0
+    vocal_silence_gate: bool = True
+    vocal_gate_threshold_db: float = -46.0
+    vocal_gate_relative_db: float = -28.0
+    vocal_gate_knee_db: float = Field(default=10.0, gt=0.0)
+    vocal_gate_attack_ms: float = Field(default=12.0, ge=1.0)
+    vocal_gate_release_ms: float = Field(default=180.0, ge=1.0)
+    vocal_gate_floor: float = Field(default=0.0, ge=0.0, le=1.0)
+    match_vocal_loudness: bool = True
+    vocal_loudness_offset_db: float = -1.5
+    vocal_loudness_gain_limit_db: float = Field(default=8.0, ge=0.0)
+    sidechain_ducking_db: float = -1.8
 
 
 class QcConfig(BaseModel):
@@ -107,7 +118,7 @@ class ModelPackage(BaseModel):
     voice_profile_path: Path | None = None
     speaker: str | None = None
     transpose: int = 0
-    f0_method: str = "harvest"
+    f0_method: str = "crepe-tiny"
     created_by: str = "audiocover"
     notes: str | None = None
 
@@ -143,7 +154,24 @@ class ModelPackage(BaseModel):
 
     def merged_conversion(self, base: ConversionConfig) -> ConversionConfig:
         data: dict[str, Any] = base.model_dump()
-        data.update({k: v for k, v in self.conversion.model_dump().items() if v is not None})
+        package_locked_keys = {
+            "backend",
+            "runtime_backend",
+            "command_template",
+            "model_path",
+            "index_path",
+            "config_path",
+            "cluster_model_path",
+            "simple_profile_path",
+            "speaker",
+        }
+        data.update(
+            {
+                k: v
+                for k, v in self.conversion.model_dump().items()
+                if v is not None and k in package_locked_keys
+            }
+        )
         if self.model_path is not None:
             data["model_path"] = self.model_path
         if self.index_path is not None:
@@ -158,8 +186,7 @@ class ModelPackage(BaseModel):
             data["runtime_backend"] = self.runtime_backend
         if self.speaker is not None:
             data["speaker"] = self.speaker
-        data["transpose"] = self.transpose
-        data["f0_method"] = self.f0_method
+        data["transpose"] = max(-24, min(24, int(data.get("transpose") or 0) + int(self.transpose or 0)))
         return ConversionConfig.model_validate(data)
 
     def write_yaml(self, path: Path) -> Path:

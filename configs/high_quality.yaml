@@ -9,7 +9,7 @@ conversion:
   backend: auto
   pitch_shift_mode: auto
   command_template: null
-  f0_method: harvest
+  f0_method: crepe-tiny
   transpose: 0
   protect: 0.33
   index_rate: 0.75
@@ -25,10 +25,21 @@ mix:
   compressor_attack_ms: 8.0
   compressor_release_ms: 90.0
   deess_amount: 0.18
-  reverb_wet: 0.055
-  reverb_decay: 0.28
+  reverb_wet: 0.095
+  reverb_decay: 0.42
   target_lufs: -14.0
   final_peak_db: -1.0
+  vocal_silence_gate: true
+  vocal_gate_threshold_db: -46.0
+  vocal_gate_relative_db: -28.0
+  vocal_gate_knee_db: 10.0
+  vocal_gate_attack_ms: 12.0
+  vocal_gate_release_ms: 180.0
+  vocal_gate_floor: 0.0
+  match_vocal_loudness: true
+  vocal_loudness_offset_db: -1.5
+  vocal_loudness_gain_limit_db: 8.0
+  sidechain_ducking_db: -1.8
 qc: {}
 keep_intermediates: true
 overwrite: false

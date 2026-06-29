@@ -130,7 +130,13 @@ def render_cover(
     converted = convert_vocal(stems.vocals, output_dir / "converted", conversion_cfg, output_dir, log=log)
     if log:
         log("polishing and mixing final cover")
-    polished, final = polish_and_mix(stems.instrumental, converted.vocal, output_dir / "mix", config.mix)
+    polished, final = polish_and_mix(
+        stems.instrumental,
+        converted.vocal,
+        output_dir / "mix",
+        config.mix,
+        reference_vocal_path=stems.vocals,
+    )
 
     if log:
         log("running output quality checks")

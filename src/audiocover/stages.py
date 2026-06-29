@@ -6,16 +6,19 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .audio import (
+    apply_sidechain_ducking,
     biquad_filter,
     db_to_gain,
     deess,
     limiter,
     load_audio,
+    match_active_loudness,
     match_channels,
     match_length,
     normalize_lufs,
     simple_room_reverb,
     soft_knee_compressor,
+    vocal_activity_mask,
     write_audio,
 )
 from .config import (
@@ -197,19 +200,57 @@ def convert_vocal(
     return Converted(output)
 
 
-def polish_and_mix(instrumental_path: Path, vocal_path: Path, out_dir: Path, cfg: MixConfig) -> tuple[Path, Path]:
+def polish_and_mix(
+    instrumental_path: Path,
+    vocal_path: Path,
+    out_dir: Path,
+    cfg: MixConfig,
+    *,
+    reference_vocal_path: Path | None = None,
+) -> tuple[Path, Path]:
     out_dir.mkdir(parents=True, exist_ok=True)
     instrumental, sr = load_audio(instrumental_path, sr=cfg.sample_rate, mono=False)
     vocal, _ = load_audio(vocal_path, sr=cfg.sample_rate, mono=False)
-    channels = max(instrumental.shape[1], vocal.shape[1])
+    reference_vocal = None
+    if reference_vocal_path is not None and reference_vocal_path.exists():
+        reference_vocal, _ = load_audio(reference_vocal_path, sr=cfg.sample_rate, mono=False)
+
+    channels = max(instrumental.shape[1], vocal.shape[1], reference_vocal.shape[1] if reference_vocal is not None else 1)
     instrumental = match_channels(instrumental, channels)
     vocal = match_channels(vocal, channels)
-    length = max(len(instrumental), len(vocal))
+    if reference_vocal is not None:
+        reference_vocal = match_channels(reference_vocal, channels)
+    length = max(len(instrumental), len(vocal), len(reference_vocal) if reference_vocal is not None else 0)
     instrumental = match_length(instrumental, length)
     vocal = match_length(vocal, length)
+    if reference_vocal is not None:
+        reference_vocal = match_length(reference_vocal, length)
+
+    activity_mask = None
+    if cfg.vocal_silence_gate and reference_vocal is not None:
+        activity_mask = vocal_activity_mask(
+            reference_vocal,
+            sr,
+            threshold_db=cfg.vocal_gate_threshold_db,
+            relative_threshold_db=cfg.vocal_gate_relative_db,
+            knee_db=cfg.vocal_gate_knee_db,
+            attack_ms=cfg.vocal_gate_attack_ms,
+            release_ms=cfg.vocal_gate_release_ms,
+            floor=cfg.vocal_gate_floor,
+        )
+        activity_mask = match_length(activity_mask, length)
+        vocal = (vocal * activity_mask).astype("float32")
 
     vocal = biquad_filter(vocal, sr, "highpass", cfg.vocal_highpass_hz)
     vocal = biquad_filter(vocal, sr, "lowpass", cfg.vocal_lowpass_hz)
+    if cfg.match_vocal_loudness and reference_vocal is not None:
+        vocal, _gain_db = match_active_loudness(
+            vocal,
+            reference_vocal,
+            mask=activity_mask,
+            target_offset_db=cfg.vocal_loudness_offset_db,
+            max_gain_db=cfg.vocal_loudness_gain_limit_db,
+        )
     vocal = deess(vocal, sr, cfg.deess_amount)
     vocal = soft_knee_compressor(
         vocal,
@@ -224,7 +265,10 @@ def polish_and_mix(instrumental_path: Path, vocal_path: Path, out_dir: Path, cfg
     polished = out_dir / "polished_vocal.wav"
     write_audio(polished, limiter(vocal, cfg.final_peak_db), sr)
 
-    mixed = instrumental * db_to_gain(cfg.instrumental_gain_db) + vocal * db_to_gain(cfg.vocal_gain_db)
+    mix_instrumental = instrumental
+    if activity_mask is not None and cfg.sidechain_ducking_db < 0:
+        mix_instrumental = apply_sidechain_ducking(instrumental, activity_mask, cfg.sidechain_ducking_db)
+    mixed = mix_instrumental * db_to_gain(cfg.instrumental_gain_db) + vocal * db_to_gain(cfg.vocal_gain_db)
     mixed = normalize_lufs(mixed, sr, cfg.target_lufs, cfg.final_peak_db)
     mixed = limiter(mixed, cfg.final_peak_db)
     final = out_dir / "final_mix.wav"

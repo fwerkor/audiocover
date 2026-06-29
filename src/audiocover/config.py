@@ -38,7 +38,7 @@ class ConversionConfig(BaseModel):
     protect: float = Field(default=0.33, ge=0.0, le=1.0)
     index_rate: float = Field(default=0.75, ge=0.0, le=1.0)
     rms_mix_rate: float = Field(default=0.25, ge=0.0, le=1.0)
-    noise_scale: float = Field(default=0.06, ge=0.0, le=2.0)
+    noise_scale: float = Field(default=0.085, ge=0.0, le=2.0)
     db_thresh: int = -40
     pad_seconds: float = Field(default=0.5, ge=0.0, le=5.0)
     chunk_seconds: float = Field(default=0.5, gt=0.0, le=30.0)
@@ -64,29 +64,29 @@ class MixConfig(BaseModel):
     vocal_highpass_hz: float = 70.0
     vocal_lowpass_hz: float | None = 18000.0
     compressor_threshold_db: float = -14.0
-    compressor_ratio: float = 1.55
+    compressor_ratio: float = 1.25
     compressor_attack_ms: float = 14.0
     compressor_release_ms: float = 180.0
-    deess_amount: float = Field(default=0.25, ge=0.0, le=1.0)
-    harshness_reduction_amount: float = Field(default=0.26, ge=0.0, le=1.0)
-    electronic_artifact_reduction_amount: float = Field(default=0.26, ge=0.0, le=1.0)
-    vocal_saturation_amount: float = Field(default=0.08, ge=0.0, le=1.0)
-    vocal_saturation_drive_db: float = Field(default=2.4, ge=0.0, le=12.0)
-    parallel_compression_mix: float = Field(default=0.12, ge=0.0, le=1.0)
+    deess_amount: float = Field(default=0.16, ge=0.0, le=1.0)
+    harshness_reduction_amount: float = Field(default=0.12, ge=0.0, le=1.0)
+    electronic_artifact_reduction_amount: float = Field(default=0.16, ge=0.0, le=1.0)
+    vocal_saturation_amount: float = Field(default=0.0, ge=0.0, le=1.0)
+    vocal_saturation_drive_db: float = Field(default=0.0, ge=0.0, le=12.0)
+    parallel_compression_mix: float = Field(default=0.0, ge=0.0, le=1.0)
     parallel_compression_threshold_db: float = -24.0
     parallel_compression_ratio: float = Field(default=3.4, ge=1.0, le=20.0)
-    parallel_compression_makeup_db: float = Field(default=1.8, ge=0.0, le=12.0)
-    vocal_body_gain_db: float = Field(default=1.18, ge=-6.0, le=6.0)
+    parallel_compression_makeup_db: float = Field(default=0.0, ge=0.0, le=12.0)
+    vocal_body_gain_db: float = Field(default=0.45, ge=-6.0, le=6.0)
     vocal_body_freq_hz: float = Field(default=220.0, ge=40.0, le=800.0)
     vocal_body_q: float = Field(default=0.8, gt=0.0, le=8.0)
-    vocal_warmth_gain_db: float = Field(default=0.20, ge=-6.0, le=6.0)
+    vocal_warmth_gain_db: float = Field(default=0.0, ge=-6.0, le=6.0)
     vocal_warmth_freq_hz: float = Field(default=360.0, ge=80.0, le=1200.0)
     vocal_warmth_q: float = Field(default=0.65, gt=0.0, le=8.0)
-    sustain_motion_amount_db: float = Field(default=0.18, ge=0.0, le=3.0)
+    sustain_motion_amount_db: float = Field(default=0.0, ge=0.0, le=3.0)
     sustain_motion_rate_hz: float = Field(default=0.42, ge=0.05, le=3.0)
-    reverb_wet: float = Field(default=0.045, ge=0.0, le=1.0)
-    reverb_decay: float = Field(default=0.52, ge=0.05, le=2.0)
-    reverb_predelay_ms: float = Field(default=24.0, ge=0.0, le=200.0)
+    reverb_wet: float = Field(default=0.006, ge=0.0, le=1.0)
+    reverb_decay: float = Field(default=0.18, ge=0.05, le=2.0)
+    reverb_predelay_ms: float = Field(default=8.0, ge=0.0, le=200.0)
     reverb_lowcut_hz: float = Field(default=190.0, ge=20.0, le=1000.0)
     reverb_highcut_hz: float = Field(default=7200.0, ge=1000.0, le=20000.0)
     vocal_doubler_mix: float = Field(default=0.0, ge=0.0, le=0.5)

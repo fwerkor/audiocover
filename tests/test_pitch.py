@@ -21,7 +21,7 @@ def test_pitch_estimator_tracks_simple_tone(tmp_path: Path) -> None:
     assert 215.0 <= float(np.median(values)) <= 225.0
 
 
-def test_auto_transpose_partially_reduces_large_gap() -> None:
+def test_auto_transpose_keeps_source_key_for_moderate_gap() -> None:
     target = {
         "valid": True,
         "f0_p10_hz": 95.0,
@@ -30,8 +30,8 @@ def test_auto_transpose_partially_reduces_large_gap() -> None:
         "recommended_target_range_hz": [80.0, 210.0],
     }
     selection = choose_auto_transpose([240.0, 260.0, 280.0, 300.0], target)
-    assert selection["selected_transpose"] == -7
-    assert selection["reason"] == "partially_reduced_large_pitch_gap"
+    assert selection["selected_transpose"] == 0
+    assert selection["reason"] == "kept_original_moderate_pitch_gap"
 
 
 def test_build_voice_profile_writes_summary(tmp_path: Path) -> None:

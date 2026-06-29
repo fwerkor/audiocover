@@ -222,14 +222,14 @@ def choose_auto_transpose(
     selected = 0
     reason = "already_in_target_range"
     abs_gap = abs(median_gap)
-    if abs_gap >= 10.0:
+    if abs_gap >= 21.0:
         selected = -7 if median_gap > 0 else 7
         reason = "partially_reduced_large_pitch_gap"
-    elif abs_gap >= 6.0:
+    elif abs_gap >= 16.0:
         selected = -5 if median_gap > 0 else 5
         reason = "partially_reduced_medium_pitch_gap"
     else:
-        reason = "kept_original_small_pitch_gap"
+        reason = "kept_original_moderate_pitch_gap" if abs_gap >= 6.0 else "kept_original_small_pitch_gap"
 
     allowed = set(candidates)
     if selected not in allowed:

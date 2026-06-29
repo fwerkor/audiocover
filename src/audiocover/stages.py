@@ -287,6 +287,19 @@ def polish_and_mix(
             attack_ms=cfg.vocal_dynamics_attack_ms,
             release_ms=cfg.vocal_dynamics_release_ms,
         )
+    if cfg.match_vocal_macro_dynamics and reference_vocal is not None:
+        vocal = match_dynamic_envelope(
+            vocal,
+            reference_vocal,
+            sr,
+            mask=activity_mask,
+            strength=cfg.vocal_macro_dynamics_strength,
+            max_gain_db=cfg.vocal_macro_dynamics_gain_limit_db,
+            frame_ms=cfg.vocal_macro_dynamics_frame_ms,
+            hop_ms=cfg.vocal_macro_dynamics_hop_ms,
+            attack_ms=cfg.vocal_macro_dynamics_attack_ms,
+            release_ms=cfg.vocal_macro_dynamics_release_ms,
+        )
     vocal = animate_sustains(
         vocal,
         sr,

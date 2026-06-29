@@ -60,8 +60,8 @@ def test_render_config_f0_wins_over_legacy_model_package_default() -> None:
 def test_high_quality_defaults_include_expression_controls() -> None:
     cfg = RenderConfig.from_yaml(Path("configs/high_quality.yaml"))
 
-    assert cfg.conversion.noise_scale == 0.25
+    assert cfg.conversion.noise_scale == 0.18
     assert cfg.mix.match_vocal_dynamics is True
-    assert cfg.mix.vocal_dynamics_strength > 0
-    assert cfg.mix.compressor_ratio < 2.8
-    assert cfg.mix.harshness_reduction_amount > 0
+    assert cfg.mix.vocal_dynamics_strength >= 0.7
+    assert cfg.mix.compressor_ratio < 2.0
+    assert cfg.mix.harshness_reduction_amount >= 0.24

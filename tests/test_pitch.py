@@ -21,7 +21,7 @@ def test_pitch_estimator_tracks_simple_tone(tmp_path: Path) -> None:
     assert 215.0 <= float(np.median(values)) <= 225.0
 
 
-def test_auto_transpose_prefers_octave_down_for_high_input() -> None:
+def test_auto_transpose_preserves_source_key_for_octave_ambiguous_input() -> None:
     target = {
         "valid": True,
         "f0_p10_hz": 95.0,
@@ -30,7 +30,8 @@ def test_auto_transpose_prefers_octave_down_for_high_input() -> None:
         "recommended_target_range_hz": [80.0, 210.0],
     }
     selection = choose_auto_transpose([240.0, 260.0, 280.0, 300.0], target)
-    assert selection["selected_transpose"] == -12
+    assert selection["selected_transpose"] == 0
+    assert selection["reason"] == "kept_original_due_to_octave_ambiguous_f0"
 
 
 def test_build_voice_profile_writes_summary(tmp_path: Path) -> None:
@@ -41,3 +42,28 @@ def test_build_voice_profile_writes_summary(tmp_path: Path) -> None:
     assert profile["valid"] is True
     assert profile["source_files"] == 2
     assert (tmp_path / "voice_profile.json").exists()
+
+
+def test_auto_transpose_applies_when_large_gap_is_not_octave_ambiguous() -> None:
+    target = {
+        "valid": True,
+        "f0_p10_hz": 95.0,
+        "f0_median_hz": 130.0,
+        "f0_p90_hz": 180.0,
+        "recommended_target_range_hz": [80.0, 210.0],
+    }
+    selection = choose_auto_transpose([430.0, 450.0, 470.0, 490.0], target)
+    assert selection["selected_transpose"] == -12
+    assert selection["reason"] == "matched_target_range"
+
+
+def test_auto_transpose_keeps_source_key_for_small_gap() -> None:
+    target = {
+        "valid": True,
+        "f0_p10_hz": 95.0,
+        "f0_median_hz": 130.0,
+        "f0_p90_hz": 180.0,
+        "recommended_target_range_hz": [80.0, 210.0],
+    }
+    selection = choose_auto_transpose([145.0, 150.0, 155.0, 160.0], target)
+    assert selection["selected_transpose"] == 0

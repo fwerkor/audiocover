@@ -11,7 +11,7 @@ from scipy import signal
 
 from .audio import load_audio
 
-DEFAULT_CANDIDATE_TRANSPOSES = (-12, 0, 12)
+DEFAULT_CANDIDATE_TRANSPOSES = (-12, -7, -5, 0, 5, 7, 12)
 
 
 def _finite_positive(values: Iterable[float]) -> np.ndarray:
@@ -147,7 +147,7 @@ def build_voice_profile(
         "source_files": len(files),
         **summarize_f0(merged),
         "files": per_file,
-        "note": "Used for automatic octave-level pitch range adaptation during rendering.",
+        "note": "Used for conservative automatic pitch range adaptation during rendering.",
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(profile, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -234,12 +234,30 @@ def choose_auto_transpose(
     zero_score = next((float(item["score"]) for item in scored if int(item["transpose"]) == 0), None)
     best = scored[0]
     best_transpose = int(best["transpose"])
-    if zero_score is not None and best_transpose != 0 and zero_score - float(best["score"]) < 2.0:
-        selected = 0
-        reason = "kept_original_range"
+    selected = 0
+    reason = "already_in_target_range"
+    if target_median:
+        input_median = float(np.median(values))
+        median_gap = 12.0 * math.log2(max(input_median, 1e-6) / float(target_median))
+    else:
+        median_gap = 0.0
+    improvement = (zero_score - float(best["score"])) if zero_score is not None else 0.0
+    octave_ambiguous = (
+        abs(best_transpose) == 12
+        and 8.0 <= abs(median_gap) <= 16.5
+        and abs(abs(median_gap) - 12.0) <= 3.0
+    )
+    if best_transpose == 0:
+        reason = "already_in_target_range"
+    elif octave_ambiguous:
+        reason = "kept_original_due_to_octave_ambiguous_f0"
+    elif abs(median_gap) < 5.0:
+        reason = "kept_original_small_pitch_gap"
+    elif improvement < 6.0:
+        reason = "kept_original_marginal_pitch_improvement"
     else:
         selected = best_transpose
-        reason = "matched_target_range" if selected else "already_in_target_range"
+        reason = "matched_target_range"
 
     return {
         "mode": "auto",

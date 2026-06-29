@@ -38,7 +38,7 @@ class ConversionConfig(BaseModel):
     protect: float = Field(default=0.33, ge=0.0, le=1.0)
     index_rate: float = Field(default=0.75, ge=0.0, le=1.0)
     rms_mix_rate: float = Field(default=0.25, ge=0.0, le=1.0)
-    noise_scale: float = Field(default=0.25, ge=0.0, le=2.0)
+    noise_scale: float = Field(default=0.18, ge=0.0, le=2.0)
     db_thresh: int = -40
     pad_seconds: float = Field(default=0.5, ge=0.0, le=5.0)
     chunk_seconds: float = Field(default=0.5, gt=0.0, le=30.0)
@@ -63,12 +63,12 @@ class MixConfig(BaseModel):
     vocal_gain_db: float = 0.0
     vocal_highpass_hz: float = 70.0
     vocal_lowpass_hz: float | None = 18000.0
-    compressor_threshold_db: float = -17.0
-    compressor_ratio: float = 2.1
-    compressor_attack_ms: float = 10.0
-    compressor_release_ms: float = 120.0
-    deess_amount: float = Field(default=0.22, ge=0.0, le=1.0)
-    harshness_reduction_amount: float = Field(default=0.16, ge=0.0, le=1.0)
+    compressor_threshold_db: float = -14.0
+    compressor_ratio: float = 1.55
+    compressor_attack_ms: float = 14.0
+    compressor_release_ms: float = 180.0
+    deess_amount: float = Field(default=0.26, ge=0.0, le=1.0)
+    harshness_reduction_amount: float = Field(default=0.24, ge=0.0, le=1.0)
     reverb_wet: float = Field(default=0.095, ge=0.0, le=1.0)
     reverb_decay: float = Field(default=0.42, ge=0.05, le=2.0)
     target_lufs: float = -14.0
@@ -84,10 +84,10 @@ class MixConfig(BaseModel):
     vocal_loudness_offset_db: float = -1.5
     vocal_loudness_gain_limit_db: float = Field(default=8.0, ge=0.0)
     match_vocal_dynamics: bool = True
-    vocal_dynamics_strength: float = Field(default=0.48, ge=0.0, le=1.0)
-    vocal_dynamics_gain_limit_db: float = Field(default=5.0, ge=0.0)
-    vocal_dynamics_attack_ms: float = Field(default=35.0, ge=1.0)
-    vocal_dynamics_release_ms: float = Field(default=220.0, ge=1.0)
+    vocal_dynamics_strength: float = Field(default=0.72, ge=0.0, le=1.0)
+    vocal_dynamics_gain_limit_db: float = Field(default=7.0, ge=0.0)
+    vocal_dynamics_attack_ms: float = Field(default=22.0, ge=1.0)
+    vocal_dynamics_release_ms: float = Field(default=170.0, ge=1.0)
     sidechain_ducking_db: float = -1.8
 
 

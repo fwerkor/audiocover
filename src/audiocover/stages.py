@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .audio import (
+    animate_sustains,
     apply_sidechain_ducking,
     biquad_filter,
     db_to_gain,
@@ -286,6 +287,14 @@ def polish_and_mix(
             attack_ms=cfg.vocal_dynamics_attack_ms,
             release_ms=cfg.vocal_dynamics_release_ms,
         )
+    vocal = animate_sustains(
+        vocal,
+        sr,
+        reference=reference_vocal,
+        mask=activity_mask,
+        amount_db=cfg.sustain_motion_amount_db,
+        rate_hz=cfg.sustain_motion_rate_hz,
+    )
     vocal = soft_saturation(vocal, amount=cfg.vocal_saturation_amount, drive_db=cfg.vocal_saturation_drive_db)
     vocal = parallel_compress(
         vocal,
@@ -301,6 +310,13 @@ def polish_and_mix(
         gain_db=cfg.vocal_body_gain_db,
         freq_hz=cfg.vocal_body_freq_hz,
         q=cfg.vocal_body_q,
+    )
+    vocal = vocal_body_eq(
+        vocal,
+        sr,
+        gain_db=cfg.vocal_warmth_gain_db,
+        freq_hz=cfg.vocal_warmth_freq_hz,
+        q=cfg.vocal_warmth_q,
     )
     vocal = plate_reverb(
         vocal,

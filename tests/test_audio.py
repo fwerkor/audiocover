@@ -5,6 +5,7 @@ import numpy as np
 
 from audiocover import audio
 from audiocover.audio import (
+    animate_sustains,
     apply_sidechain_ducking,
     limiter,
     match_active_loudness,
@@ -124,3 +125,17 @@ def test_professional_vocal_polish_helpers_keep_audio_safe() -> None:
     assert np.all(np.isfinite(polished))
     assert peak_dbfs(polished) <= 0.0
     assert not np.allclose(polished, base)
+
+
+def test_animate_sustains_adds_subtle_motion_to_loud_sections() -> None:
+    sr = 1000
+    x = np.ones((sr * 3, 1), dtype=np.float32) * 0.08
+    ref = x.copy()
+    mask = np.ones_like(x)
+
+    animated = animate_sustains(x, sr, reference=ref, mask=mask, amount_db=1.0, rate_hz=0.5)
+
+    assert animated.shape == x.shape
+    assert np.all(np.isfinite(animated))
+    assert float(np.std(animated[:, 0])) > 0.0005
+    assert peak_dbfs(animated) <= -18.0

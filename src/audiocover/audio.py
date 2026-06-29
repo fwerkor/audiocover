@@ -434,6 +434,52 @@ def vocal_body_eq(
     return signal.sosfiltfilt(sos, data, axis=0).astype(np.float32)
 
 
+def animate_sustains(
+    data: np.ndarray,
+    sr: int,
+    *,
+    reference: np.ndarray | None = None,
+    mask: np.ndarray | None = None,
+    amount_db: float = 0.55,
+    rate_hz: float = 0.42,
+    focus_percentile: float = 62.0,
+) -> np.ndarray:
+    """Add very slow gain movement to strong sustained vocal regions.
+
+    This is intentionally subtle. It does not attempt pitch correction or vibrato;
+    it prevents long, high-energy notes from feeling like a perfectly flat render
+    by adding small musical level motion only where the reference vocal is active
+    and relatively sustained.
+    """
+    if amount_db <= 0 or data.size == 0:
+        return data.astype(np.float32)
+    source = reference if reference is not None and reference.size else data
+    env = _mono_rms_envelope(source, sr, frame_ms=160.0, hop_ms=40.0)
+    if env.size == 0:
+        return data.astype(np.float32)
+    env = match_length(env[:, None], len(data))[:, 0]
+    weights = np.ones(len(data), dtype=np.float32)
+    if mask is not None and mask.size:
+        weights = match_length(mask, len(data))[:, 0].astype(np.float32)
+    active_env = env[weights > 0.2]
+    if active_env.size == 0:
+        return data.astype(np.float32)
+    threshold = float(np.percentile(active_env, focus_percentile))
+    upper = float(np.percentile(active_env, 90.0))
+    spread = upper - threshold
+    if spread <= max(upper, 1e-7) * 0.02:
+        focus = np.clip(weights, 0.0, 1.0).astype(np.float32)
+    else:
+        focus = np.clip((env - threshold) / max(spread, 1e-7), 0.0, 1.0)
+        focus = (focus * np.clip(weights, 0.0, 1.0)).astype(np.float32)
+    focus = smooth_envelope(focus, sr, attack_ms=220.0, release_ms=520.0)
+    t = np.arange(len(data), dtype=np.float32) / float(sr)
+    motion = np.sin(2.0 * math.pi * float(rate_hz) * t) + 0.45 * np.sin(2.0 * math.pi * float(rate_hz) * 0.57 * t + 1.3)
+    motion /= 1.45
+    gain_db = motion * float(amount_db) * focus
+    return (data * db_to_gain(gain_db)[:, None]).astype(np.float32)
+
+
 def plate_reverb(
     data: np.ndarray,
     sr: int,

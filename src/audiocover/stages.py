@@ -5,6 +5,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+import audiocover.audio as audio_helpers
+
 from .audio import (
     animate_sustains,
     apply_sidechain_ducking,
@@ -17,6 +19,7 @@ from .audio import (
     match_active_loudness,
     match_channels,
     match_dynamic_envelope,
+    match_micro_dynamic_envelope,
     match_length,
     match_original_stem_balance,
     normalize_lufs,
@@ -305,6 +308,19 @@ def polish_and_mix(
         attack_ms=cfg.compressor_attack_ms,
         release_ms=cfg.compressor_release_ms,
     )
+    if reference_vocal is not None:
+        vocal = match_dynamic_envelope(
+            vocal,
+            reference_vocal,
+            sr,
+            mask=activity_mask,
+            strength=0.50,
+            max_gain_db=3.0,
+            frame_ms=18.0,
+            hop_ms=5.0,
+            attack_ms=4.0,
+            release_ms=36.0,
+        )
     if cfg.match_vocal_dynamics and reference_vocal is not None:
         vocal = match_dynamic_envelope(
             vocal,
@@ -336,6 +352,13 @@ def polish_and_mix(
         mask=activity_mask,
         amount_db=cfg.sustain_motion_amount_db,
         rate_hz=cfg.sustain_motion_rate_hz,
+    )
+    vocal = reduce_electronic_artifacts(
+        vocal,
+        sr,
+        amount=cfg.electronic_artifact_reduction_amount * 0.55,
+        low_hz=3200.0,
+        high_hz=16000.0,
     )
     vocal = soft_saturation(vocal, amount=cfg.vocal_saturation_amount, drive_db=cfg.vocal_saturation_drive_db)
     vocal = parallel_compress(

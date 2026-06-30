@@ -332,6 +332,142 @@ def match_dynamic_envelope(
     return (data * gain[:, None]).astype(np.float32)
 
 
+def match_micro_dynamic_envelope(
+    data: np.ndarray,
+    reference: np.ndarray,
+    sr: int,
+    *,
+    mask: np.ndarray | None = None,
+    strength: float = 0.55,
+    max_gain_db: float = 3.0,
+    frame_ms: float = 18.0,
+    hop_ms: float = 5.0,
+    attack_ms: float = 4.0,
+    release_ms: float = 36.0,
+    transient_boost: float = 0.35,
+) -> np.ndarray:
+    """Follow source vocal syllable-level energy without flattening phrases.
+
+    This complements the normal and macro dynamic matchers. It uses a short
+    envelope and removes its slower trend, so it mainly transfers word attacks,
+    quick decays, and small tail-energy movements instead of changing whole-line
+    loudness.
+    """
+    if strength <= 0 or data.size == 0 or reference.size == 0:
+        return data.astype(np.float32)
+    ref_env = _mono_rms_envelope(reference, sr, frame_ms=frame_ms, hop_ms=hop_ms)
+    data_env = _mono_rms_envelope(data, sr, frame_ms=frame_ms, hop_ms=hop_ms)
+    if ref_env.size == 0 or data_env.size == 0:
+        return data.astype(np.float32)
+    ref_env = match_length(ref_env[:, None], len(data))[:, 0]
+    data_env = match_length(data_env[:, None], len(data))[:, 0]
+
+    weights = np.ones(len(data), dtype=np.float32)
+    if mask is not None and mask.size:
+        weights = match_length(mask, len(data))[:, 0].astype(np.float32)
+    active = weights > 0.12
+    if not np.any(active):
+        return data.astype(np.float32)
+
+    ref_db = 20.0 * np.log10(np.maximum(ref_env, 1e-8))
+    data_db = 20.0 * np.log10(np.maximum(data_env, 1e-8))
+    ref_slow = smooth_envelope(ref_db.astype(np.float32), sr, attack_ms=90.0, release_ms=180.0)
+    data_slow = smooth_envelope(data_db.astype(np.float32), sr, attack_ms=90.0, release_ms=180.0)
+    ref_micro = ref_db - ref_slow
+    data_micro = data_db - data_slow
+    target_delta = ref_micro - data_micro
+
+    ref_rise = np.maximum(np.diff(ref_db, prepend=ref_db[0]), 0.0)
+    if np.any(active):
+        rise_scale = float(np.percentile(ref_rise[active], 90.0))
+    else:
+        rise_scale = 0.0
+    if rise_scale > 1e-6 and transient_boost > 0:
+        transient_focus = np.clip(ref_rise / rise_scale, 0.0, 1.0)
+        target_delta *= 1.0 + float(transient_boost) * transient_focus
+
+    gain_db = np.clip(target_delta * float(strength), -max_gain_db, max_gain_db)
+    gain_db *= np.clip(weights, 0.0, 1.0)
+    gain_db -= float(np.median(gain_db[active]))
+    smoothed = smooth_envelope(gain_db.astype(np.float32), sr, attack_ms=attack_ms, release_ms=release_ms)
+    return (data * db_to_gain(smoothed)[:, None]).astype(np.float32)
+
+
+def preserve_reference_consonants(
+    data: np.ndarray,
+    reference: np.ndarray,
+    sr: int,
+    *,
+    mask: np.ndarray | None = None,
+    amount: float = 0.25,
+    highpass_hz: float = 4200.0,
+    lowpass_hz: float = 14500.0,
+    max_gain_db: float = 4.0,
+) -> np.ndarray:
+    """Blend a small high-frequency consonant layer from the source vocal.
+
+    The layer is derived only from the source high band and is gated toward
+    sibilants, breathy consonants, and short high-frequency transients. This
+    preserves intelligibility and timing cues from the original performance
+    without mixing the full original singer timbre back into the converted vocal.
+    """
+    if amount <= 0 or data.size == 0 or reference.size == 0:
+        return data.astype(np.float32)
+    amount = float(np.clip(amount, 0.0, 1.0))
+    src = data if data.ndim > 1 else data[:, None]
+    ref = match_channels(reference if reference.ndim > 1 else reference[:, None], src.shape[1])
+    ref = match_length(ref, len(src))
+
+    high = min(float(lowpass_hz), sr / 2.0 - 100.0)
+    low = min(float(highpass_hz), high - 100.0)
+    if high <= low or low < 200.0:
+        return src.astype(np.float32)
+
+    ref_band = biquad_filter(ref, sr, "highpass", low)
+    ref_band = biquad_filter(ref_band, sr, "lowpass", high)
+    src_band = biquad_filter(src, sr, "highpass", low)
+    src_band = biquad_filter(src_band, sr, "lowpass", high)
+
+    high_env = _mono_rms_envelope(ref_band, sr, frame_ms=14.0, hop_ms=4.0)
+    full_env = _mono_rms_envelope(ref, sr, frame_ms=26.0, hop_ms=8.0)
+    if high_env.size == 0 or full_env.size == 0:
+        return src.astype(np.float32)
+    high_env = match_length(high_env[:, None], len(src))[:, 0]
+    full_env = match_length(full_env[:, None], len(src))[:, 0]
+
+    weights = np.ones(len(src), dtype=np.float32)
+    if mask is not None and mask.size:
+        weights = match_length(mask, len(src))[:, 0].astype(np.float32)
+    active = (weights > 0.08) & (high_env > db_to_gain(-80.0))
+    if not np.any(active):
+        return src.astype(np.float32)
+
+    high_threshold = float(np.percentile(high_env[active], 58.0))
+    high_upper = float(np.percentile(high_env[active], 92.0))
+    high_focus = np.clip((high_env - high_threshold) / max(high_upper - high_threshold, 1e-8), 0.0, 1.0)
+
+    ratio = high_env / np.maximum(full_env, 1e-8)
+    ratio_threshold = float(np.percentile(ratio[active], 55.0))
+    ratio_upper = float(np.percentile(ratio[active], 92.0))
+    ratio_focus = np.clip((ratio - ratio_threshold) / max(ratio_upper - ratio_threshold, 1e-8), 0.0, 1.0)
+
+    focus = np.maximum(high_focus * 0.72, ratio_focus * 0.86)
+    focus = (focus * np.clip(weights, 0.0, 1.0)).astype(np.float32)
+    focus = smooth_envelope(focus, sr, attack_ms=3.5, release_ms=42.0)
+    if float(np.max(focus)) <= 1e-5:
+        return src.astype(np.float32)
+
+    focus_mask = focus[:, None]
+    ref_rms = _active_rms(ref_band, focus_mask)
+    src_rms = _active_rms(src_band, focus_mask)
+    if ref_rms <= 1e-8 or src_rms <= 1e-8:
+        band_gain = 1.0
+    else:
+        band_gain = float(np.clip(src_rms / ref_rms, db_to_gain(-max_gain_db), db_to_gain(max_gain_db)))
+    addition = ref_band * band_gain * amount * focus_mask
+    return (src + addition).astype(np.float32)
+
+
 def reduce_vocal_noise(
     data: np.ndarray,
     sr: int,
@@ -402,8 +538,9 @@ def reduce_electronic_artifacts(
     """Suppress buzzy/phasey converter residues without changing pitch.
 
     The processor only controls the high-mid/high band where neural-vocoder
-    residues tend to read as electronic. It avoids adding noise or flattening
-    the whole vocal.
+    residues tend to read as electronic. It combines a fast band compressor with
+    narrow-band spectral debuzzing, so stable whistle/buzz lines are reduced
+    without adding noise or flattening the whole vocal.
     """
     if amount <= 0 or data.size == 0:
         return data.astype(np.float32)
@@ -414,7 +551,73 @@ def reduce_electronic_artifacts(
     band = biquad_filter(data, sr, "bandpass", [low, high])
     controlled = soft_knee_compressor(band, sr, threshold_db=-36.0, ratio=7.0, attack_ms=0.8, release_ms=55.0)
     controlled *= 1.0 - 0.35 * amount
-    return (data - band * amount + controlled * amount).astype(np.float32)
+    compressed = (data - band * amount + controlled * amount).astype(np.float32)
+    return _spectral_debuzz(compressed, sr, amount=amount, low_hz=low, high_hz=high)
+
+
+def _spectral_debuzz(
+    data: np.ndarray,
+    sr: int,
+    *,
+    amount: float,
+    low_hz: float,
+    high_hz: float,
+) -> np.ndarray:
+    """Attenuate narrow high-band vocoder buzz while preserving broad consonants."""
+    amount = float(np.clip(amount, 0.0, 1.0))
+    if amount <= 0 or data.size == 0:
+        return data.astype(np.float32)
+    src = data if data.ndim > 1 else data[:, None]
+    nperseg = min(1536, max(384, int(sr * 0.032)))
+    noverlap = int(nperseg * 0.75)
+    freq_pad = 4
+    channels: list[np.ndarray] = []
+    for ch in range(src.shape[1]):
+        x = src[:, ch].astype(np.float32)
+        freqs, _times, zxx = signal.stft(
+            x,
+            fs=sr,
+            window="hann",
+            nperseg=nperseg,
+            noverlap=noverlap,
+            boundary="zeros",
+        )
+        mag = np.abs(zxx).astype(np.float32)
+        if mag.size == 0:
+            channels.append(x)
+            continue
+        freq_mask = (freqs >= low_hz) & (freqs <= high_hz)
+        if not np.any(freq_mask):
+            channels.append(x)
+            continue
+
+        padded = np.pad(mag, ((freq_pad, freq_pad), (0, 0)), mode="edge")
+        local = np.zeros_like(mag)
+        for offset in range(freq_pad * 2 + 1):
+            local += padded[offset : offset + mag.shape[0], :]
+        local /= float(freq_pad * 2 + 1)
+
+        tonal_excess = np.clip((mag - local * 1.22) / np.maximum(mag, 1e-8), 0.0, 1.0)
+        tonal_excess[~freq_mask, :] = 0.0
+        if tonal_excess.shape[1] >= 3:
+            smoothed = tonal_excess.copy()
+            smoothed[:, 1:-1] = (
+                0.25 * tonal_excess[:, :-2] + 0.5 * tonal_excess[:, 1:-1] + 0.25 * tonal_excess[:, 2:]
+            )
+            tonal_excess = smoothed
+        attenuation = 1.0 - (0.72 * amount) * tonal_excess
+        attenuation[freqs > min(high_hz, sr / 2.0 - 200.0), :] = 1.0
+        attenuation[freqs < low_hz, :] = 1.0
+        _, cleaned = signal.istft(
+            zxx * attenuation,
+            fs=sr,
+            window="hann",
+            nperseg=nperseg,
+            noverlap=noverlap,
+            input_onesided=True,
+        )
+        channels.append(match_length(cleaned.astype(np.float32)[:, None], len(src))[:, 0])
+    return np.stack(channels, axis=1).astype(np.float32)
 
 
 def biquad_filter(data: np.ndarray, sr: int, kind: str, cutoff) -> np.ndarray:

@@ -30,9 +30,9 @@ mix:
   compressor_release_ms: 180.0
   deess_amount: 0.16
   harshness_reduction_amount: 0.12
-  electronic_artifact_reduction_amount: 0.28
-  vocal_denoise_amount: 0.22
-  vocal_denoise_floor: 0.74
+  electronic_artifact_reduction_amount: 0.24
+  vocal_denoise_amount: 0.20
+  vocal_denoise_floor: 0.76
   vocal_saturation_amount: 0.0
   vocal_saturation_drive_db: 0.0
   parallel_compression_mix: 0.0

@@ -69,9 +69,9 @@ class MixConfig(BaseModel):
     compressor_release_ms: float = 180.0
     deess_amount: float = Field(default=0.16, ge=0.0, le=1.0)
     harshness_reduction_amount: float = Field(default=0.12, ge=0.0, le=1.0)
-    electronic_artifact_reduction_amount: float = Field(default=0.28, ge=0.0, le=1.0)
-    vocal_denoise_amount: float = Field(default=0.22, ge=0.0, le=1.0)
-    vocal_denoise_floor: float = Field(default=0.74, ge=0.35, le=1.0)
+    electronic_artifact_reduction_amount: float = Field(default=0.24, ge=0.0, le=1.0)
+    vocal_denoise_amount: float = Field(default=0.20, ge=0.0, le=1.0)
+    vocal_denoise_floor: float = Field(default=0.76, ge=0.35, le=1.0)
     vocal_saturation_amount: float = Field(default=0.0, ge=0.0, le=1.0)
     vocal_saturation_drive_db: float = Field(default=0.0, ge=0.0, le=12.0)
     parallel_compression_mix: float = Field(default=0.0, ge=0.0, le=1.0)

@@ -356,7 +356,7 @@ def polish_and_mix(
     vocal = reduce_electronic_artifacts(
         vocal,
         sr,
-        amount=cfg.electronic_artifact_reduction_amount * 0.55,
+        amount=cfg.electronic_artifact_reduction_amount * 0.40,
         low_hz=3200.0,
         high_hz=16000.0,
     )

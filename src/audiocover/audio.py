@@ -378,10 +378,7 @@ def match_micro_dynamic_envelope(
     target_delta = ref_micro - data_micro
 
     ref_rise = np.maximum(np.diff(ref_db, prepend=ref_db[0]), 0.0)
-    if np.any(active):
-        rise_scale = float(np.percentile(ref_rise[active], 90.0))
-    else:
-        rise_scale = 0.0
+    rise_scale = float(np.percentile(ref_rise[active], 90.0))
     if rise_scale > 1e-6 and transient_boost > 0:
         transient_focus = np.clip(ref_rise / rise_scale, 0.0, 1.0)
         target_delta *= 1.0 + float(transient_boost) * transient_focus

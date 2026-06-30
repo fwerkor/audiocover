@@ -5,8 +5,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-import audiocover.audio as audio_helpers
-
 from .audio import (
     animate_sustains,
     apply_sidechain_ducking,
@@ -19,7 +17,6 @@ from .audio import (
     match_active_loudness,
     match_channels,
     match_dynamic_envelope,
-    match_micro_dynamic_envelope,
     match_length,
     match_original_stem_balance,
     normalize_lufs,

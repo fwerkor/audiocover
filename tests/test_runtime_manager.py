@@ -584,3 +584,18 @@ def test_so_vits_worker_patches_numpy_binary_plotting(monkeypatch) -> None:
 
     assert spectrogram.shape[-1] == 4
     assert line_plot.shape[-1] == 4
+
+
+def test_so_vits_worker_checkpoint_retention_uses_ten_epoch_interval(tmp_path: Path) -> None:
+    from audiocover.workers import so_vits_svc_worker
+
+    filelist_dir = tmp_path / "filelists" / "44k"
+    filelist_dir.mkdir(parents=True)
+    (filelist_dir / "train.txt").write_text("\n".join(f"item-{idx}" for idx in range(188)) + "\n", encoding="utf-8")
+    train_cfg = {"epochs": 120, "batch_size": 4, "eval_interval": 200, "keep_ckpts": 3}
+
+    so_vits_svc_worker._configure_so_vits_checkpoint_retention(train_cfg, filelist_dir)
+
+    assert train_cfg["eval_interval"] == 470
+    assert train_cfg["keep_ckpts"] == 14
+    assert train_cfg["ckpt_name_by_step"] is False

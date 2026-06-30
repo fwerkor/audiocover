@@ -43,6 +43,25 @@ _REQUIRED_IMPORTS: tuple[tuple[str, str], ...] = (
 
 _SO_VITS_SVC_SAMPLE_RATE = 44100
 _SO_VITS_SVC_F0_METHODS = {"crepe", "crepe-tiny", "parselmouth", "dio", "harvest"}
+_SO_VITS_SVC_CHECKPOINT_INTERVAL_EPOCHS = 10
+
+
+def _count_filelist_items(path: Path) -> int:
+    if not path.exists():
+        return 0
+    return sum(1 for line in path.read_text(encoding="utf-8").splitlines() if line.strip())
+
+
+def _configure_so_vits_checkpoint_retention(train_cfg: dict[str, Any], filelist_dir: Path) -> None:
+    epochs = max(1, int(train_cfg.get("epochs") or 200))
+    batch_size = max(1, int(train_cfg.get("batch_size") or 8))
+    train_items = _count_filelist_items(filelist_dir / "train.txt")
+    batches_per_epoch = max(1, math.ceil(train_items / batch_size))
+
+    train_cfg["eval_interval"] = batches_per_epoch * _SO_VITS_SVC_CHECKPOINT_INTERVAL_EPOCHS
+    expected_checkpoints = math.ceil(epochs / _SO_VITS_SVC_CHECKPOINT_INTERVAL_EPOCHS) + 2
+    train_cfg["keep_ckpts"] = max(expected_checkpoints, int(train_cfg.get("keep_ckpts") or 0))
+    train_cfg["ckpt_name_by_step"] = False
 
 
 def _resolve_so_vits_sample_rate(requested: int | str | None) -> tuple[int, str | None]:
@@ -705,6 +724,13 @@ def train(payload: dict[str, Any]) -> dict[str, Any]:
         train_cfg = data.setdefault("train", {})
         train_cfg["epochs"] = int(payload.get("epochs") or train_cfg.get("epochs") or 200)
         train_cfg["batch_size"] = int(payload.get("batch_size") or train_cfg.get("batch_size") or 8)
+        _configure_so_vits_checkpoint_retention(train_cfg, filelist_dir)
+        print(
+            "so-vits-svc: checkpointing every "
+            f"{_SO_VITS_SVC_CHECKPOINT_INTERVAL_EPOCHS} epoch(s); "
+            f"keeping up to {train_cfg['keep_ckpts']} checkpoint(s)",
+            flush=True,
+        )
         data_cfg = data.setdefault("data", {})
         data_cfg["sampling_rate"] = sample_rate
         model_cfg = data.setdefault("model", {})
